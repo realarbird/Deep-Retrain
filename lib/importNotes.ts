@@ -1,7 +1,7 @@
 /** Turn an uploaded notes file (Markdown, text, PDF or Word) into plain text for the ingest editor. */
 import { MAX_NOTES_CHARS } from "@/lib/validation";
 
-export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+export { MAX_IMPORT_BYTES, MAX_IMPORT_MB } from "@/lib/importLimits";
 export const IMPORT_EXTENSIONS = [".md", ".markdown", ".txt", ".pdf", ".docx"] as const;
 
 export class UnsupportedFileError extends Error {}

@@ -1,6 +1,6 @@
 import { connection, NextResponse } from "next/server";
 import { errorResponse, HttpError, requireIdentity } from "@/lib/api";
-import { extractNotesText, MAX_IMPORT_BYTES, UnsupportedFileError } from "@/lib/importNotes";
+import { extractNotesText, MAX_IMPORT_BYTES, MAX_IMPORT_MB, UnsupportedFileError } from "@/lib/importNotes";
 
 export const maxDuration = 60;
 
@@ -16,7 +16,9 @@ export async function POST(request: Request) {
     });
     const file = form.get("file");
     if (!(file instanceof File) || file.size === 0) throw new HttpError(400, "Choose a file to import.");
-    if (file.size > MAX_IMPORT_BYTES) throw new HttpError(413, "That file is over 5 MB. Split it or paste the part you need.");
+    if (file.size > MAX_IMPORT_BYTES) {
+      throw new HttpError(413, `That file is over ${MAX_IMPORT_MB} MB. Split it or paste the part you need.`);
+    }
 
     const result = await extractNotesText(file.name, new Uint8Array(await file.arrayBuffer())).catch((err) => {
       if (err instanceof UnsupportedFileError) throw new HttpError(415, err.message);
