@@ -5,9 +5,9 @@ import { Upload } from "lucide-react";
 import type { AppActions } from "@/components/AppShell";
 import { Button, Card, cx, ErrorNote, inputClass, SectionTitle, Tag } from "@/components/ui/primitives";
 import { api, ApiError, engineName, type EngineId, type ReviewCard } from "@/lib/client";
+import { MAX_IMPORT_BYTES, MAX_IMPORT_MB } from "@/lib/importLimits";
 
 const MAX_CHARS = 20_000;
-const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ACCEPT = ".md,.markdown,.txt,.pdf,.docx";
 
 const EXAMPLE_NOTES = `# The Science of Learning — Lecture 4
@@ -76,8 +76,8 @@ export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAi
     if (fileInput.current) fileInput.current.value = "";
     setError(null);
     setImportNote(null);
-    if (file.size > MAX_FILE_BYTES) {
-      setError("That file is over 5 MB. Split it or paste the part you need.");
+    if (file.size > MAX_IMPORT_BYTES) {
+      setError(`That file is over ${MAX_IMPORT_MB} MB. Split it or paste the part you need.`);
       return;
     }
     if (notes.trim() && !window.confirm(`Replace the notes in the editor with ${file.name}?`)) return;
@@ -221,8 +221,9 @@ export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAi
           <section>
             <h3 className="font-medium text-ink">Importing files</h3>
             <p className="mt-2">
-              Markdown, plain text, PDF and Word (.docx) files up to 5 MB. The text is pulled out so you can check it before
-              making cards; the file itself isn&apos;t kept. Scanned PDFs have no text layer and need OCR first.
+              Markdown, plain text, PDF and Word (.docx) files up to {MAX_IMPORT_MB} MB. The text is pulled out so you can
+              check it before making cards; the file itself isn&apos;t kept. Scanned PDFs have no text layer and need OCR
+              first.
             </p>
           </section>
           {!hasAiKey && (
