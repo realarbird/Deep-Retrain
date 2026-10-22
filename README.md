@@ -34,7 +34,7 @@ Cramming feels productive and fades within days. DeepRetain asks for about **15 
 | | Demo Mode | Signed in (Auth0) |
 |---|---|---|
 | Decks | The two sample decks only (AP Biology, CS) | Your own notes only. Sample decks are removed |
-| Adding notes | No | Paste, or import `.md`, `.txt`, `.pdf`, `.docx` (up to 25 MB) |
+| Adding notes | No | Paste, or import `.md`, `.txt`, `.pdf`, `.docx` (up to 50 MB) |
 | Grading | Ollama if the server has it, else the offline grader | Gemma 4 with **your own free key**, then Ollama, then the offline grader |
 
 ## Features
@@ -213,7 +213,7 @@ Sample decks include three weeks of **simulated** review history so the charts h
 | Route | Purpose |
 |---|---|
 | `POST /api/ingest` | Signed in only. `{ deckTitle, rawText }` → extraction → embeddings → cards in box 1 |
-| `POST /api/import` | Signed in only. Multipart `file` (`.md`, `.txt`, `.pdf`, `.docx`, ≤ 25 MB) → `{ title, text, truncated }`. Nothing is stored |
+| `POST /api/import` | Signed in only. Multipart `file` (`.md`, `.txt`, `.pdf`, `.docx`, ≤ 50 MB) → `{ title, text, truncated }`. Nothing is stored |
 | `GET/PUT/DELETE /api/ai-key` | Signed in only. Key status (`saved`, `hint`, `model`), save `{ apiKey }` (verified with Google, sealed, stored in Auth0), or remove |
 | `POST /api/review` | `{ mode: "answer", cardId, answer, latencyMs, tzOffsetMinutes }` → grade, Leitner move, log. `{ mode: "followup", reviewLogId, answer }` → follow-up reply |
 | `GET /api/dashboard?tz=` | Due cards, box stats, cap status, latency trend, AI key status. Removes sample decks from signed-in accounts |

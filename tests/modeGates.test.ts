@@ -48,7 +48,7 @@ describe("Demo Mode vs signed-in features", () => {
     expect(await ok.json()).toMatchObject({ title: "notes", text: "# Notes" });
   });
 
-  it("imports files past the old 5 MB cap, up to the 25 MB limit", async () => {
+  it("imports files past the old 5 MB cap, up to the 50 MB limit", async () => {
     const { POST } = await import("@/app/api/import/route");
     const { MAX_IMPORT_BYTES } = await import("@/lib/importLimits");
     current = alice;
@@ -64,7 +64,7 @@ describe("Demo Mode vs signed-in features", () => {
 
     const tooBig = await upload(MAX_IMPORT_BYTES + 1);
     expect(tooBig.status).toBe(413);
-    expect((await tooBig.json()).error).toMatch(/over 25 MB/);
+    expect((await tooBig.json()).error).toMatch(/over 50 MB/);
   });
 
   it("keeps AI keys to signed-in learners", async () => {
