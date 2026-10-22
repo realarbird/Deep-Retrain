@@ -10,9 +10,34 @@ export const SPACED_INITIAL_STABILITY_DAYS = 1.2;
 export const STABILITY_GROWTH = 2.5;
 /** Cumulative review days implied by Box intervals 1, 3, 7, 14, 30. */
 export const SPACED_REVIEW_DAYS = [1, 4, 11, 25, 55];
-/** The crammer studies once, the night before an exam on day 28. */
-export const CRAM_DAY = 28;
-/** Long enough to show what each plan leaves two weeks after the exam. */
+
+export interface Exam {
+  day: number;
+  label: string;
+}
+
+/** A class exam on day 28, then the AP Exam on day 41. */
+export const EXAMS: Exam[] = [
+  { day: 28, label: "Exam" },
+  { day: 41, label: "AP Exam" },
+];
+
+export interface CramSession {
+  day: number;
+  /** Recall right after the session, in percent. */
+  peak: number;
+}
+
+/**
+ * The crammer studies for the day 28 exam, then crams again on day 40, the
+ * night before the AP Exam. That second burst only gets recall back to 25%.
+ */
+export const CRAM_SESSIONS: CramSession[] = [
+  { day: 28, peak: 100 },
+  { day: 40, peak: 25 },
+];
+
+/** Runs a day past the AP Exam, so its marker isn't on the chart's edge. */
 export const RETENTION_CHART_DAYS = 42;
 
 export function retentionAt(daysSince: number, stabilityDays: number): number {
@@ -21,17 +46,18 @@ export function retentionAt(daysSince: number, stabilityDays: number): number {
 
 export interface RetentionPoint {
   day: number;
-  /** Null before the cram session: nothing has been studied yet. */
+  /** Null before the first cram session: nothing has been studied yet. */
   cramming: number | null;
   spaced: number;
 }
 
-/** Modeled recall of one concept: crammed once on `cramDay`, versus learned on day 0 and reviewed at the Leitner cadence. */
+/** Modeled recall of one concept: crammed in bursts before each exam, versus learned on day 0 and reviewed at the Leitner cadence. */
 export function buildRetentionCurves(
   days = RETENTION_CHART_DAYS,
-  cramDay = CRAM_DAY,
-): { points: RetentionPoint[]; reviewDays: number[]; cramDay: number } {
+  cramSessions = CRAM_SESSIONS,
+): { points: RetentionPoint[]; reviewDays: number[]; cramSessions: CramSession[]; exams: Exam[] } {
   const reviewDays = SPACED_REVIEW_DAYS.filter((d) => d <= days);
+  const sessions = cramSessions.filter((s) => s.day <= days).sort((a, b) => a.day - b.day);
   const points: RetentionPoint[] = [];
 
   for (let day = 0; day <= days; day++) {
@@ -44,14 +70,17 @@ export function buildRetentionCurves(
       }
     }
 
+    // Each cram replaces what is left of the last one, which has faded to almost nothing by then.
+    const cram = sessions.findLast((s) => s.day <= day);
+
     points.push({
       day,
-      cramming: day < cramDay ? null : round1(retentionAt(day - cramDay, CRAM_STABILITY_DAYS) * 100),
+      cramming: cram ? round1(cram.peak * retentionAt(day - cram.day, CRAM_STABILITY_DAYS)) : null,
       spaced: round1(retentionAt(day - lastReview, stability) * 100),
     });
   }
 
-  return { points, reviewDays, cramDay };
+  return { points, reviewDays, cramSessions: sessions, exams: EXAMS.filter((e) => e.day <= days) };
 }
 
 export interface LatencyLog {

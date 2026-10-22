@@ -21,7 +21,7 @@ describe("buildRetentionCurves", () => {
   });
 
   it("has nothing to recall before the day 28 cram session", () => {
-    expect(curves.cramDay).toBe(28);
+    expect(curves.cramSessions[0]).toEqual({ day: 28, peak: 100 });
     expect(curves.points.slice(0, 28).every((p) => p.cramming === null)).toBe(true);
     expect(curves.points[28].cramming).toBe(100);
   });
@@ -29,6 +29,22 @@ describe("buildRetentionCurves", () => {
   it("lets the cram fade within a week while spaced recall holds", () => {
     expect(curves.points[35].cramming).toBeLessThan(5);
     expect(curves.points[42].spaced).toBeGreaterThan(60);
+  });
+
+  it("marks the class exam on day 28 and the AP Exam on day 41", () => {
+    expect(curves.exams).toEqual([
+      { day: 28, label: "Exam" },
+      { day: 41, label: "AP Exam" },
+    ]);
+  });
+
+  it("crams again on day 40, but only back to 25%", () => {
+    expect(curves.cramSessions[1]).toEqual({ day: 40, peak: 25 });
+    expect(curves.points[39].cramming).toBeLessThan(1);
+    expect(curves.points[40].cramming).toBe(25);
+    // AP Exam day: the burst has already faded, while spaced recall is still high.
+    expect(curves.points[41].cramming).toBeCloseTo(15.2, 1);
+    expect(curves.points[41].spaced).toBeGreaterThan(70);
   });
 
   it("restores retention to 100% on review days", () => {

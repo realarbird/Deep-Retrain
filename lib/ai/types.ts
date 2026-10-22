@@ -6,8 +6,8 @@ export const EMBEDDING_DIMENSIONS = 384;
 export type Engine = "ollama" | "google-ai-studio" | "heuristic";
 
 export const ENGINE_LABELS: Record<Engine, string> = {
-  ollama: "Gemma 2 on Ollama",
-  "google-ai-studio": "Gemini Flash-Lite with your AI Studio key",
+  ollama: "Gemma 4 on Ollama",
+  "google-ai-studio": "Gemma 4 with your AI Studio key",
   heuristic: "Offline grader",
 };
 

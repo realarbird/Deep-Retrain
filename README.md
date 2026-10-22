@@ -6,6 +6,16 @@ DeepRetain splits dense lecture notes into single concepts, then a **latency-awa
 
 Built for the **Hacktoberfest 2026 Open-Source AI Challenge, Week 3: "Slow and Steady"**.
 
+## Open-source AI at the core
+
+Every answer is graded by **Gemma 4**, Google's open model family, released under **Apache 2.0**.
+
+- **Hosted, free:** `gemma-4-26b-a4b-it` on Google AI Studio, called with each learner's own free key. It is a mixture of experts that runs about 4B parameters per token, so grading comes back quickly.
+- **Self-hosted:** the same model family runs on your own machine through [Ollama](https://ollama.com) (`gemma4:e4b` by default), so notes never have to leave it.
+- **Offline:** if neither is reachable, an open-source heuristic grader in this repo keeps the study loop going.
+
+Because the weights are open, anyone can inspect, self-host, or fine-tune the grader, and DeepRetain doesn't depend on one vendor's closed model.
+
 ## The lazy payoff
 
 Cramming feels productive and fades within days. DeepRetain asks for about **15 short answers a day, at most**, and schedules them just before you'd forget. That's when a single recall does the most good.
@@ -25,18 +35,18 @@ Cramming feels productive and fades within days. DeepRetain asks for about **15 
 |---|---|---|
 | Decks | The two sample decks only (AP Biology, CS) | Your own notes only. Sample decks are removed |
 | Adding notes | No | Paste, or import `.md`, `.txt`, `.pdf`, `.docx` (up to 5 MB) |
-| Grading | Ollama if the server has it, else the offline grader | Gemini 3.5 Flash-Lite with **your own free key**, then Ollama, then the offline grader |
+| Grading | Ollama if the server has it, else the offline grader | Gemma 4 with **your own free key**, then Ollama, then the offline grader |
 
 ## Features
 
-- **Bring your own free AI key.** Signed-in learners create a key at [aistudio.google.com/api-keys](https://aistudio.google.com/api-keys) and paste it on the **AI key** tab. The default model, `gemini-3.5-flash-lite`, is Google's lowest-latency free-tier model; grading uses minimal thinking. The server has no key of its own.
+- **Bring your own free AI key.** Signed-in learners create a key at [aistudio.google.com/api-keys](https://aistudio.google.com/api-keys) and paste it on the **AI key** tab. The default model, `gemma-4-26b-a4b-it`, is open (Apache 2.0), free on AI Studio, and fast; grading runs with thinking off. The server has no key of its own.
 - **Keys are encrypted before they reach Auth0.** The browser sends the key over HTTPS. The server checks it with Google, seals it with AES-256-GCM (key derived from `AUTH0_SECRET` with HKDF, bound to the learner's Auth0 `sub`), and stores only the sealed value in the user's Auth0 `app_metadata` through the Management API. It is never stored in MongoDB and never returned in full.
 - **Note import.** Markdown and text are read as-is; PDFs go through `unpdf` and Word files through `mammoth`. The extracted text lands in the editor to check before cards are made, and the file isn't kept.
 - **Latency-aware review.** One card at a time, with a stopwatch that can be hidden and pauses while the tab is hidden. The model's 0–100 score is combined with `responseLatencyMs`.
 - **Adaptive difficulty.** Box 1 asks *recall* questions, box 2 *application*, box 3+ *synthesis*. On promotion, the model writes the next, harder question, often linking the concept to a related one from your own deck.
 - **Identity-scoped RAG.** Related concepts come from Atlas Vector Search, **pre-filtered by the signed-in Auth0 `sub`** and re-checked before anything reaches the prompt.
 - **Anti-cramming pacer.** A daily cap (default 15) counted on the learner's local day.
-- **Cramming vs DeepRetain** on the sign-in page: modeled recall of one concept over six weeks, where the crammer studies once on **day 28** (the night before an exam) and DeepRetain teaches it on day 0 and reviews it on days 1, 4, 11 and 25. A table under the chart gives the values on exam day and one and two weeks later.
+- **Cramming vs DeepRetain** on the sign-in page: modeled recall of one concept over six weeks. The crammer studies for an exam on **day 28**, then crams again on **day 40**, the night before the **AP Exam on day 41**, but that burst only gets recall back to 25%. DeepRetain teaches the concept on day 0 and reviews it on days 1, 4, 11 and 25. A table under the chart gives the values on exam day, a week later, and on AP Exam day.
 - **Dashboard.** Leitner box distribution and a recall-time trend with a 7-day average.
 
 ## Architecture
@@ -58,8 +68,8 @@ flowchart LR
   end
 
   subgraph AI["Models"]
-    GS["Google AI Studio<br/>Gemini 3.5 Flash-Lite<br/>(learner's key)"]
-    O["Ollama<br/>gemma2:9b + all-minilm"]
+    GS["Google AI Studio<br/>Gemma 4 26B A4B<br/>(learner's key)"]
+    O["Ollama<br/>gemma4:e4b + all-minilm"]
     H["Offline heuristic engine"]
   end
 
@@ -86,7 +96,7 @@ sequenceDiagram
   participant A as Review screen
   participant S as /api/review
   participant V as Atlas Vector Search
-  participant G as Gemini (learner's key)
+  participant G as Gemma 4 (learner's key)
   U->>A: answers (stopwatch running)
   A->>S: cardId, answer, latencyMs
   S->>S: daily cap check, ownership check, unseal key
@@ -109,8 +119,8 @@ New concepts are due right away for their first recall pass, then follow the box
 
 ### Provider chain (`lib/engine.ts`)
 
-1. **Google AI Studio with the learner's key**: `gemini-3.5-flash-lite` with a JSON response schema and the default temperature (Gemini 3 is tuned for it). Grading uses minimal thinking; extraction uses low. If the key can't reach that model (HTTP 404) the next one, `gemini-3.1-flash-lite`, is tried. `GOOGLE_AI_MODEL` pins a single model, for example `gemma-4-26b-a4b-it` to stay on open-weight Gemma. A rejected key skips straight to the next engine.
-2. **Ollama** (`OLLAMA_BASE_URL`): Gemma 2 with Ollama structured outputs. Used for Demo Mode and for learners without a key.
+1. **Google AI Studio with the learner's key**: `gemma-4-26b-a4b-it` with a system instruction, a JSON response schema and thinking off (`minimal`). If the key can't reach that model (HTTP 404) the next one, `gemma-4-31b-it`, is tried. `GOOGLE_AI_MODEL` pins a single model. A rejected key skips straight to the next engine.
+2. **Ollama** (`OLLAMA_BASE_URL`): Gemma 4 (`gemma4:e4b`, or `OLLAMA_MODEL`) with Ollama structured outputs. Used for Demo Mode and for learners without a key.
 3. **Offline heuristic engine**: lexical key-point coverage plus templated follow-up questions and analogies.
 
 Every response reports the engine that produced it.
@@ -121,7 +131,7 @@ Every response reports the engine that produced it.
 |---|---|
 | Framework | Next.js 16 (App Router, Cache Components, `proxy.ts`), React 19, TypeScript |
 | UI | Tailwind CSS 4 with light and dark tokens, IBM Plex Sans/Mono, Lucide icons, Recharts 3 |
-| AI | Gemini 3.5 Flash-Lite on Google AI Studio (learner's key), Gemma 2 on Ollama, `all-minilm` embeddings |
+| AI | Gemma 4 (Apache 2.0): 26B A4B on Google AI Studio (learner's key), `gemma4:e4b` on Ollama, `all-minilm` embeddings |
 | Import | `unpdf` (PDF), `mammoth` (Word) |
 | Data | MongoDB Atlas with Mongoose 9 and Atlas Vector Search (384-dim, cosine, filtered by `auth0Id`) |
 | Auth | `@auth0/nextjs-auth0` v4 plus the Auth0 Management API for the sealed key; Demo Mode for judges |
@@ -133,7 +143,7 @@ Every response reports the engine that produced it.
 **Prerequisites:** Node 20.9+ and an Atlas cluster (the free M0 works). [Ollama](https://ollama.com) is optional.
 
 ```bash
-ollama pull gemma2:9b       # optional: grading without a learner key
+ollama pull gemma4:e4b      # optional: grading without a learner key (gemma4:26b matches the hosted model)
 ollama pull all-minilm      # optional: 384-dim embeddings
 ```
 
@@ -173,6 +183,8 @@ Without the index, retrieval falls back to in-app cosine similarity over the sam
 
 When the Auth0 variables are missing, the app runs in Demo Mode only and hides sign-in.
 
+**Sign-in sends you to a broken localhost page?** The app told Auth0 to return to `localhost`. On Render, leave `APP_BASE_URL` unset (the app uses `RENDER_EXTERNAL_URL`) or set it to your public `https://` URL; a `localhost` value is now ignored there. Then check that the Auth0 application lists `https://<service>.onrender.com/auth/callback` under Allowed Callback URLs. `GET /api/health` shows the URL in use as `auth.baseUrl`.
+
 `AUTH0_SECRET` also derives the key that seals learners' AI keys. Rotating it signs everyone out and means they need to paste their key again.
 
 ### Learner AI keys
@@ -187,7 +199,7 @@ Free-tier keys have rate limits; when a learner hits one, grading falls back to 
 
 1. Push this repository to GitHub.
 2. In Render, choose **New → Blueprint**, select the repo, and Render reads [`render.yaml`](render.yaml).
-3. Fill in the prompted secrets. `MONGODB_URI` is required, the rest are optional. `AUTH0_SECRET` is generated for you, and `APP_BASE_URL` defaults to Render's external URL.
+3. Fill in the prompted secrets. `MONGODB_URI` is required, the rest are optional. `AUTH0_SECRET` is generated for you. Don't copy `APP_BASE_URL=http://localhost:3000` from `.env.example`: leave it unset and the app uses Render's external URL.
 4. Add `https://<service>.onrender.com/auth/callback` to your Auth0 application, and authorize it for the Management API (step 4 above).
 
 ## Demo Mode

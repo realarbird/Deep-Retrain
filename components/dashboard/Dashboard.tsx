@@ -38,7 +38,7 @@ export function Dashboard({ data, actions, isDemo }: { data: DashboardData; acti
       {!isDemo && !data.aiKey.saved && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-sunken px-4 py-3 text-sm">
           <p className="text-ink-2">
-            <span className="font-medium text-ink">Add your free AI key</span> to have answers graded by Gemini Flash-Lite. Until
+            <span className="font-medium text-ink">Add your free AI key</span> to have answers graded by Gemma 4. Until
             then, the offline grader checks answers by keyword.
           </p>
           <Button variant="secondary" className="py-1.5" onClick={() => actions.goTo("settings")}>
