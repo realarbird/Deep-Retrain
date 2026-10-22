@@ -1,0 +1,53 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# One-click deploy: New → Blueprint → point at this repo. Render prompts for every `sync: false` value.
+services:
+  - type: web
+    name: deepretain
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+
+      # MongoDB Atlas (required). Allow Render's outbound IPs (or 0.0.0.0/0) in Atlas → Network Access.
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: deepretain
+      - key: ATLAS_VECTOR_INDEX
+        value: concept_embedding_index
+
+      # Gemma. Point OLLAMA_BASE_URL at a reachable Ollama server (e.g. a tunnel to your laptop or a GPU box);
+      # otherwise hosted Gemma on Google AI Studio is used when GEMINI_API_KEY is set, then the offline engine.
+      - key: OLLAMA_BASE_URL
+        sync: false
+      - key: OLLAMA_MODEL
+        value: gemma2:9b
+      - key: OLLAMA_EMBED_MODEL
+        value: all-minilm
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_GEMMA_MODEL
+        value: gemma-4-26b-a4b-it
+
+      # Auth0 (optional — leave blank to run in Demo Mode only). APP_BASE_URL defaults to RENDER_EXTERNAL_URL.
+      - key: AUTH0_DOMAIN
+        sync: false
+      - key: AUTH0_CLIENT_ID
+        sync: false
+      - key: AUTH0_CLIENT_SECRET
+        sync: false
+      - key: AUTH0_SECRET
+        generateValue: true
+
+      # Study pacing and judge access
+      - key: DEMO_MODE_ENABLED
+        value: "true"
+      - key: DAILY_COGNITIVE_CAP
+        value: "15"

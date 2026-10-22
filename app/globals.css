@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
+
+  /* Chart roles — validated for the dark slate surface (see README › Data viz) */
+  --color-viz-spaced: #059669;
+  --color-viz-cram: #d95926;
+  --color-viz-primary: #6366f1;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #020617;
+  color: #e2e8f0;
+}
+
+::selection {
+  background: rgb(99 102 241 / 0.35);
+}
+
+/* Subtle paper-grain glow behind the app */
+.app-backdrop {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgb(99 102 241 / 0.12), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgb(5 150 105 / 0.10), transparent 60%),
+    #020617;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise {
+    animation: none;
+  }
+}
