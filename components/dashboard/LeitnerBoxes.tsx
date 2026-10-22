@@ -3,9 +3,9 @@
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, SectionTitle } from "@/components/ui/primitives";
 import type { DashboardData } from "@/lib/client";
-import { AXIS_PROPS, TooltipBox, VIZ } from "./chartTheme";
+import { AXIS_PROPS, TooltipBox, VIZ } from "@/components/charts/chartTheme";
 
-const BOX_NOTES = ["New & reset", "Warming up", "Taking hold", "Durable", "Mastered"];
+const BOX_NOTES = ["New or reset", "Warming up", "Taking hold", "Durable", "Long-term"];
 
 export function LeitnerBoxes({ boxes }: { boxes: DashboardData["boxes"] }) {
   const data = boxes.map((b) => ({
@@ -17,7 +17,7 @@ export function LeitnerBoxes({ boxes }: { boxes: DashboardData["boxes"] }) {
 
   return (
     <Card className="p-5">
-      <SectionTitle title="Leitner boxes" subtitle={`${total} concepts · each box doubles the time a memory has to hold`} />
+      <SectionTitle title="Cards by box" subtitle={`${total} concepts. Each box waits longer before the next review.`} />
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 20, right: 8, bottom: 0, left: -20 }} barCategoryGap="28%">
@@ -25,7 +25,7 @@ export function LeitnerBoxes({ boxes }: { boxes: DashboardData["boxes"] }) {
             <XAxis dataKey="label" {...AXIS_PROPS} />
             <YAxis allowDecimals={false} {...AXIS_PROPS} axisLine={false} />
             <Tooltip
-              cursor={{ fill: "rgb(148 163 184 / 0.08)" }}
+              cursor={{ fill: VIZ.grid, fillOpacity: 0.5 }}
               content={({ active, payload }) => {
                 const p = payload?.[0]?.payload as (typeof data)[number] | undefined;
                 if (!active || !p) return null;
@@ -40,16 +40,16 @@ export function LeitnerBoxes({ boxes }: { boxes: DashboardData["boxes"] }) {
                 );
               }}
             />
-            <Bar dataKey="count" fill={VIZ.primary} radius={[4, 4, 0, 0]} maxBarSize={56} isAnimationActive={false}>
+            <Bar dataKey="count" fill={VIZ.primary} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false}>
               <LabelList dataKey="count" position="top" fill={VIZ.textPrimary} fontSize={12} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <ol className="mt-3 grid grid-cols-5 gap-1 text-center text-[11px] leading-tight text-slate-500">
+      <ol className="mt-3 grid grid-cols-5 gap-1 text-center text-[11px] leading-tight text-ink-3">
         {data.map((b) => (
           <li key={b.box}>
-            <span className="block text-slate-400">{b.intervalDays}d</span>
+            <span className="block font-mono text-ink-2">{b.intervalDays}d</span>
             {BOX_NOTES[b.box - 1]}
           </li>
         ))}

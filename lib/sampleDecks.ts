@@ -68,14 +68,17 @@ function simulateHistory(key: SampleDeckKey, now: Date, tzOffsetMinutes: number)
   return reviews.sort((a, b) => a.reviewedAt.getTime() - b.reviewedAt.getTime());
 }
 
-async function removeSampleDeck(identity: Identity, key: SampleDeckKey): Promise<void> {
-  const decks = await StudyDeck.find({ auth0Id: identity.userId, sampleKey: key }).select("_id").lean();
+/** Delete a learner's sample decks (one, or all of them) with their cards and review history. */
+export async function removeSampleDecks(userId: string, key?: SampleDeckKey): Promise<void> {
+  const decks = await StudyDeck.find({ auth0Id: userId, sourceType: "sample", ...(key ? { sampleKey: key } : {}) })
+    .select("_id")
+    .lean();
   const deckIds = decks.map((d) => d._id);
   if (!deckIds.length) return;
   await Promise.all([
-    ConceptCard.deleteMany({ auth0Id: identity.userId, deckId: { $in: deckIds } }),
-    ReviewLog.deleteMany({ auth0Id: identity.userId, deckId: { $in: deckIds } }),
-    StudyDeck.deleteMany({ auth0Id: identity.userId, _id: { $in: deckIds } }),
+    ConceptCard.deleteMany({ auth0Id: userId, deckId: { $in: deckIds } }),
+    ReviewLog.deleteMany({ auth0Id: userId, deckId: { $in: deckIds } }),
+    StudyDeck.deleteMany({ auth0Id: userId, _id: { $in: deckIds } }),
   ]);
 }
 
@@ -86,7 +89,7 @@ export async function seedSampleDeck(
   now = new Date(),
 ): Promise<{ deckId: Types.ObjectId; title: string; cardCount: number; dueNow: number; embeddingModel: string }> {
   const sample = SAMPLE_DECKS[key];
-  await removeSampleDeck(identity, key);
+  await removeSampleDecks(identity.userId, key);
 
   const deck = await StudyDeck.create({
     auth0Id: identity.userId,

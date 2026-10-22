@@ -1,7 +1,7 @@
 /**
  * Identity-scoped retrieval (RAG) over the learner's own concept graph.
  *
- * Gemma only ever sees concepts the authenticated caller owns:
+ * The model only ever sees concepts the authenticated caller owns:
  *   1. the anchor card must belong to the caller (Auth0 `sub` / demo id),
  *   2. Atlas Vector Search is pre-filtered on `auth0Id`,
  *   3. every hit is re-checked against the session before it reaches a prompt.

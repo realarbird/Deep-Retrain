@@ -1,25 +1,27 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
-const fraunces = Fraunces({ variable: "--font-fraunces", subsets: ["latin"], axes: ["opsz"] });
-const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"] });
+const plexSans = IBM_Plex_Sans({ variable: "--font-plex-sans", subsets: ["latin"], weight: ["400", "500", "600"] });
+const plexMono = IBM_Plex_Mono({ variable: "--font-plex-mono", subsets: ["latin"], weight: ["400", "500"] });
 
 export const metadata: Metadata = {
-  title: "DeepRetain · Forgetting-Curve Knowledge Engine",
+  title: "DeepRetain",
   description:
-    "An anti-cramming study companion: Gemma turns your notes into atomic concepts, and latency-aware Leitner micro-reviews make them stick.",
+    "A spaced-repetition study app. It turns your notes into a few short reviews a day and schedules each one just before you'd forget it.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#020617",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f9f9f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d0d0d" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${fraunces.variable} ${jetbrains.variable} h-full antialiased`}>
-      <body className="app-backdrop min-h-full font-sans">{children}</body>
+    <html lang="en" className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}>
+      <body className="min-h-full font-sans">{children}</body>
     </html>
   );
 }

@@ -1,35 +1,69 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens. Warm neutrals, one accent, hairline borders.
+ * Light is the default; dark values are their own steps, not an inversion.
+ * Chart colors were checked with a colorblind-safety validator against both surfaces.
+ */
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
 
-  /* Chart roles — validated for the dark slate surface (see README › Data viz) */
-  --color-viz-spaced: #059669;
-  --color-viz-cram: #d95926;
-  --color-viz-primary: #6366f1;
+  --color-page: #f9f9f7;
+  --color-surface: #fcfcfb;
+  --color-sunken: #f3f2ef;
+  --color-ink: #0b0b0b;
+  --color-ink-2: #52514e;
+  --color-ink-3: #75736d;
+  --color-line: #e1e0d9;
+  --color-line-strong: #c3c2b7;
+  --color-on-ink: #fcfcfb;
+
+  --color-accent: #2a78d6;
+  --color-accent-text: #1c5cab;
+  --color-accent-soft: #86b6ef;
+  --color-cram: #eb6834;
+
+  --color-good: #0ca30c;
+  --color-good-text: #006300;
+  --color-warning: #fab219;
+  --color-critical: #d03b3b;
+  --color-critical-text: #b42a2a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-page: #0d0d0d;
+    --color-surface: #1a1a19;
+    --color-sunken: #141413;
+    --color-ink: #f0efec;
+    --color-ink-2: #c3c2b7;
+    --color-ink-3: #9a988f;
+    --color-line: #2c2c2a;
+    --color-line-strong: #45443f;
+    --color-on-ink: #0b0b0b;
+
+    --color-accent: #3987e5;
+    --color-accent-text: #86b6ef;
+    --color-accent-soft: #6da7ec;
+    --color-cram: #d95926;
+
+    --color-good-text: #3fbf3f;
+    --color-critical-text: #e66767;
+  }
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light dark;
 }
 
 body {
-  background: #020617;
-  color: #e2e8f0;
+  background: var(--color-page);
+  color: var(--color-ink);
 }
 
 ::selection {
-  background: rgb(99 102 241 / 0.35);
-}
-
-/* Subtle paper-grain glow behind the app */
-.app-backdrop {
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgb(99 102 241 / 0.12), transparent 60%),
-    radial-gradient(900px 500px at 110% 10%, rgb(5 150 105 / 0.10), transparent 60%),
-    #020617;
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
 
 .scrollbar-none {
@@ -37,24 +71,4 @@ body {
 }
 .scrollbar-none::-webkit-scrollbar {
   display: none;
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.animate-rise {
-  animation: rise 0.35s ease-out both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-rise {
-    animation: none;
-  }
 }

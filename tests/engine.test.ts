@@ -23,16 +23,20 @@ const EVAL = {
   nextQuestion: "If the membrane leaked protons, what would happen to ATP output?",
 };
 
-async function loadGemma() {
+async function loadEngine() {
   vi.resetModules();
-  return import("@/lib/gemma");
+  return import("@/lib/engine");
 }
 
-describe("gemma provider chain", () => {
+function googleReply(body: unknown) {
+  return jsonResponse({ candidates: [{ content: { parts: [{ text: JSON.stringify(body) }] } }] });
+}
+
+describe("AI provider chain", () => {
   beforeEach(() => {
     vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
     vi.stubEnv("OLLAMA_MODEL", "gemma2:9b");
-    vi.stubEnv("GEMINI_API_KEY", "");
+    vi.stubEnv("GOOGLE_AI_MODEL", "");
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -47,7 +51,7 @@ describe("gemma provider chain", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { evaluateAndFollowUp } = await loadGemma();
+    const { evaluateAndFollowUp } = await loadEngine();
     const r = await evaluateAndFollowUp(CARD, "uses the proton gradient across the inner membrane to make ATP", 5_000);
 
     expect(r.engine).toBe("ollama");
@@ -68,7 +72,7 @@ describe("gemma provider chain", () => {
           : jsonResponse({ message: { content: JSON.stringify(EVAL) } }),
       ),
     );
-    const { evaluateAndFollowUp } = await loadGemma();
+    const { evaluateAndFollowUp } = await loadEngine();
     const r = await evaluateAndFollowUp(CARD, "answer", 20_000);
     expect(r.outcome).toBe("hesitation");
     expect(r.newBox).toBe(1);
@@ -86,30 +90,76 @@ describe("gemma provider chain", () => {
           : jsonResponse({ message: { content: JSON.stringify(longAnalogy) } }),
       ),
     );
-    const { evaluateAndFollowUp } = await loadGemma();
+    const { evaluateAndFollowUp } = await loadEngine();
     const r = await evaluateAndFollowUp(CARD, "wrong", 3_000);
     expect(r.outcome).toBe("reset");
     expect(r.analogy).toBe("One. Two.");
   });
 
-  it("falls back to Google AI Studio when Ollama is unreachable", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "test-key");
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url.includes("ollama.test")) throw new TypeError("fetch failed");
+  it("uses the learner's own Google key before Ollama", async () => {
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
       if (url.includes("generativelanguage.googleapis.com"))
         return jsonResponse({ candidates: [{ content: { parts: [{ text: "```json\n" + JSON.stringify(EVAL) + "\n```" }] } }] });
       throw new Error(`unexpected ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { evaluateAndFollowUp } = await loadGemma();
-    const r = await evaluateAndFollowUp(CARD, "answer", 5_000);
+    const { evaluateAndFollowUp } = await loadEngine();
+    const r = await evaluateAndFollowUp(CARD, "answer", 5_000, { googleApiKey: "learner-key" });
     expect(r.engine).toBe("google-ai-studio");
     expect(r.score).toBe(90);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get("x-goog-api-key")).toBe("learner-key");
+  });
+
+  it("never calls Google without a learner key", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma2:9b" }] });
+      if (url.endsWith("/api/chat")) return jsonResponse({ message: { content: JSON.stringify(EVAL) } });
+      throw new Error(`unexpected ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { evaluateAndFollowUp } = await loadEngine();
+    const r = await evaluateAndFollowUp(CARD, "answer", 5_000, { googleApiKey: null });
+    expect(r.engine).toBe("ollama");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("googleapis"))).toBe(false);
+  });
+
+  it("moves on to Ollama when Google rejects the learner's key", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("generativelanguage.googleapis.com"))
+        return jsonResponse({ error: { message: "API key not valid. Please pass a valid API key.", status: "INVALID_ARGUMENT" } }, 400);
+      if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma2:9b" }] });
+      if (url.endsWith("/api/chat")) return jsonResponse({ message: { content: JSON.stringify(EVAL) } });
+      throw new Error(`unexpected ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { evaluateAndFollowUp } = await loadEngine();
+    const r = await evaluateAndFollowUp(CARD, "answer", 5_000, { googleApiKey: "revoked-key" });
+    expect(r.engine).toBe("ollama");
+    // A rejected key is not retried in plain mode.
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("googleapis"))).toHaveLength(1);
+  });
+
+  it("passes the learner's key to extraction and follow-up replies", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      const body = String(init?.body ?? "");
+      return body.includes("NOTES:")
+        ? googleReply({ concepts: [{ conceptTitle: "Mutex", coreFact: "One thread at a time.", initialQuestion: "What is a mutex?", expectedKeyPoints: ["one thread"] }] })
+        : googleReply({ reply: "Right. The lock is the point." });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { extractConceptsFromNotes, replyToFollowUp } = await loadEngine();
+    const x = await extractConceptsFromNotes("## Mutex\nA mutex lets one thread at a time into a critical section.", { googleApiKey: "k" });
+    expect(x.engine).toBe("google-ai-studio");
+    const f = await replyToFollowUp(CARD, "Why a lock?", "because", { googleApiKey: "k" });
+    expect(f).toEqual({ reply: "Right. The lock is the point.", engine: "google-ai-studio" });
   });
 
   it("falls back to the heuristic engine when every provider fails", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "test-key");
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
@@ -118,12 +168,16 @@ describe("gemma provider chain", () => {
         return jsonResponse({ error: "quota" }, 429);
       }),
     );
-    const { evaluateAndFollowUp, extractConceptsFromNotes } = await loadGemma();
-    const r = await evaluateAndFollowUp(CARD, "It uses the proton gradient across the inner mitochondrial membrane and makes ATP", 4_000);
+    const { evaluateAndFollowUp, extractConceptsFromNotes } = await loadEngine();
+    const r = await evaluateAndFollowUp(CARD, "It uses the proton gradient across the inner mitochondrial membrane and makes ATP", 4_000, {
+      googleApiKey: "test-key",
+    });
     expect(r.engine).toBe("heuristic");
     expect(r.outcome).toBe("promote");
 
-    const x = await extractConceptsFromNotes("## Glycolysis\nGlycolysis splits glucose into two pyruvate molecules in the cytoplasm and nets two ATP.");
+    const x = await extractConceptsFromNotes("## Glycolysis\nGlycolysis splits glucose into two pyruvate molecules in the cytoplasm and nets two ATP.", {
+      googleApiKey: "test-key",
+    });
     expect(x.engine).toBe("heuristic");
     expect(x.concepts[0].conceptTitle).toBe("Glycolysis");
   });
@@ -148,7 +202,7 @@ describe("gemma provider chain", () => {
           : jsonResponse({ message: { content: JSON.stringify(extraction) } }),
       ),
     );
-    const { extractConceptsFromNotes } = await loadGemma();
+    const { extractConceptsFromNotes } = await loadEngine();
     const r = await extractConceptsFromNotes("notes");
     expect(r.engine).toBe("ollama");
     expect(r.concepts).toHaveLength(1);
@@ -169,7 +223,7 @@ describe("gemma provider chain", () => {
           : jsonResponse({ message: { content: JSON.stringify(concepts) } }),
       ),
     );
-    const { extractConceptsFromNotes } = await loadGemma();
+    const { extractConceptsFromNotes } = await loadEngine();
     const r = await extractConceptsFromNotes("notes");
     expect(r.engine).toBe("ollama");
     expect(r.concepts[0].conceptTitle).toBe("Mutex");

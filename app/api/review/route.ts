@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { getGoogleApiKey } from "@/lib/aiKey";
 import { HttpError, readJson, withIdentity } from "@/lib/api";
-import { evaluateAndFollowUp, replyToFollowUp } from "@/lib/gemma";
+import { evaluateAndFollowUp, replyToFollowUp } from "@/lib/engine";
 import type { Identity } from "@/lib/identity";
 import { findRelatedConcepts, assertOwnership, type RelatedHit, type RetrievalMethod } from "@/lib/retrieval";
 import { getCapStatus, toReviewCardDTO } from "@/lib/study";
@@ -63,7 +64,7 @@ async function handleAnswer(
     },
     answer,
     latencyMs,
-    related,
+    { related, googleApiKey: await getGoogleApiKey(identity) },
   );
 
   const nextQuestion =
@@ -154,7 +155,9 @@ async function handleFollowUp(identity: Identity, reviewLogId: string, answer: s
   const card = await ConceptCard.findOne({ _id: log.cardId, auth0Id: identity.userId }).select("conceptTitle coreFact").lean();
   if (!card) throw new HttpError(404, "That concept no longer exists.");
 
-  const { reply, engine } = await replyToFollowUp(card, log.followUpQuestion, answer);
+  const { reply, engine } = await replyToFollowUp(card, log.followUpQuestion, answer, {
+    googleApiKey: await getGoogleApiKey(identity),
+  });
   log.followUpAnswer = answer;
   log.followUpReply = reply;
   await log.save();

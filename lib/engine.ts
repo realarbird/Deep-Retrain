@@ -1,15 +1,15 @@
 /**
- * DeepRetain's Gemma service.
+ * DeepRetain's AI service.
  *
  * Every task runs through a provider chain so the study loop never stalls:
- *   1. Gemma 2 on Ollama (local or self-hosted, OLLAMA_BASE_URL)
- *   2. Gemma on Google AI Studio (GEMINI_API_KEY) for cloud demos
+ *   1. Gemini on Google AI Studio, with the signed-in learner's own key
+ *   2. Gemma 2 on Ollama (local or self-hosted, OLLAMA_BASE_URL)
  *   3. An offline heuristic engine
  * Each result reports which engine produced it.
  */
 import type { z } from "zod";
 import { decideOutcome, LATENCY_THRESHOLD_MS, nextTier, type DifficultyTier, type ReviewOutcome } from "@/lib/leitner";
-import { googleConfigured, googleGenerateJson, type ThinkingLevel } from "@/lib/ai/googleAiStudio";
+import { GoogleKeyError, googleGenerateJson, type ThinkingLevel } from "@/lib/ai/googleAiStudio";
 import { heuristicEvaluate, heuristicExtract, heuristicFollowUpReply, heuristicQuestion } from "@/lib/ai/heuristic";
 import { parseModelJson } from "@/lib/ai/json";
 import { markOllamaDown, ollamaChatJson, ollamaChatModel, ollamaHasModel } from "@/lib/ai/ollama";
@@ -35,6 +35,8 @@ import {
 } from "@/lib/ai/types";
 
 const MAX_CONCEPTS = 12;
+/** A hosted call that hasn't answered by now is failing; hand over to the next engine. */
+const HOSTED_TIMEOUT_MS = 45_000;
 
 interface JsonTask<S extends z.ZodType> {
   name: string;
@@ -45,8 +47,13 @@ interface JsonTask<S extends z.ZodType> {
   timeoutMs: number;
   /** Output token budget for the local model. */
   maxTokens: number;
-  /** Reasoning depth for hosted Gemma 4: fast for grading, deeper for one-off extraction. */
+  /** Reasoning depth for the hosted model: minimal for grading, a little more for one-off extraction. */
   hostedThinking: ThinkingLevel;
+}
+
+/** Per-request AI settings. `googleApiKey` is the learner's own key, or null (Demo Mode, or none saved). */
+export interface AiOptions {
+  googleApiKey?: string | null;
 }
 
 function isParseError(err: unknown): boolean {
@@ -57,7 +64,27 @@ function isParseError(err: unknown): boolean {
 async function runJsonTask<S extends z.ZodType>(
   task: JsonTask<S>,
   fallback: () => z.infer<S>,
+  { googleApiKey }: AiOptions = {},
 ): Promise<{ data: z.infer<S>; engine: Engine }> {
+  if (googleApiKey) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const raw = await googleGenerateJson(task.system, task.user, {
+          apiKey: googleApiKey,
+          timeoutMs: Math.min(task.timeoutMs, HOSTED_TIMEOUT_MS),
+          // Leave headroom for the model's minimal reasoning tokens.
+          maxTokens: Math.max(1_024, task.maxTokens * 2),
+          jsonSchema: task.jsonSchema,
+          thinkingLevel: task.hostedThinking,
+        });
+        return { data: parseModelJson(raw, task.schema), engine: "google-ai-studio" };
+      } catch (err) {
+        console.warn(`[ai:${task.name}] Google AI Studio attempt ${attempt + 1} failed:`, (err as Error).message);
+        if (err instanceof GoogleKeyError || !isParseError(err)) break;
+      }
+    }
+  }
+
   if (await ollamaHasModel(ollamaChatModel())) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
@@ -67,29 +94,11 @@ async function runJsonTask<S extends z.ZodType>(
         });
         return { data: parseModelJson(raw, task.schema), engine: "ollama" };
       } catch (err) {
-        console.warn(`[gemma:${task.name}] Ollama attempt ${attempt + 1} failed:`, (err as Error).message);
+        console.warn(`[ai:${task.name}] Ollama attempt ${attempt + 1} failed:`, (err as Error).message);
         if (!isParseError(err)) {
           if ((err as Error).name !== "TimeoutError") markOllamaDown();
           break;
         }
-      }
-    }
-  }
-
-  if (googleConfigured()) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const raw = await googleGenerateJson(task.system, task.user, {
-          timeoutMs: task.timeoutMs,
-          // Leave headroom for Gemma 4's minimal reasoning tokens.
-          maxTokens: Math.max(1_024, task.maxTokens * 2),
-          jsonSchema: task.jsonSchema,
-          thinkingLevel: task.hostedThinking,
-        });
-        return { data: parseModelJson(raw, task.schema), engine: "google-ai-studio" };
-      } catch (err) {
-        console.warn(`[gemma:${task.name}] Google AI Studio attempt ${attempt + 1} failed:`, (err as Error).message);
-        if (!isParseError(err)) break;
       }
     }
   }
@@ -135,6 +144,7 @@ function normalizeConcepts(concepts: ExtractedConcept[]): ExtractedConcept[] {
 /** Chunk raw lecture notes into atomic flashcards. */
 export async function extractConceptsFromNotes(
   rawText: string,
+  ai: AiOptions = {},
 ): Promise<{ concepts: ExtractedConcept[]; engine: Engine }> {
   const { data, engine } = await runJsonTask(
     {
@@ -145,9 +155,10 @@ export async function extractConceptsFromNotes(
       schema: extractionSchema,
       timeoutMs: 180_000,
       maxTokens: 4_000,
-      hostedThinking: "high",
+      hostedThinking: "low",
     },
     () => ({ concepts: heuristicExtract(rawText) }),
+    ai,
   );
   const concepts = normalizeConcepts(data.concepts);
   if (!concepts.length && engine !== "heuristic") {
@@ -189,8 +200,7 @@ export async function evaluateAndFollowUp(
   card: ReviewCardInput,
   userAnswer: string,
   latencyMs: number,
-  related: RelatedConcept[] = [],
-  now = new Date(),
+  { related = [], now = new Date(), ...ai }: AiOptions & { related?: RelatedConcept[]; now?: Date } = {},
 ): Promise<EvaluationResult> {
   const targetTier = nextTier(card.leitnerBox);
   const wasFast = latencyMs < LATENCY_THRESHOLD_MS;
@@ -206,6 +216,7 @@ export async function evaluateAndFollowUp(
       hostedThinking: "minimal",
     },
     () => heuristicEvaluate(card, userAnswer, related, targetTier),
+    ai,
   );
 
   const score = Math.round(Math.min(100, Math.max(0, Number.isFinite(data.score) ? data.score : 0)));
@@ -234,6 +245,7 @@ export async function replyToFollowUp(
   card: Pick<EvaluationCardInput, "conceptTitle" | "coreFact">,
   followUpQuestion: string,
   answer: string,
+  ai: AiOptions = {},
 ): Promise<{ reply: string; engine: Engine }> {
   const { data, engine } = await runJsonTask(
     {
@@ -247,13 +259,14 @@ export async function replyToFollowUp(
       hostedThinking: "minimal",
     },
     () => heuristicFollowUpReply(card, answer),
+    ai,
   );
   return { reply: firstSentences(data.reply, 2), engine };
 }
 
 /** Which engine would handle the next request (for the UI badge). */
-export async function activeEngine(): Promise<Engine> {
+export async function activeEngine({ googleApiKey }: AiOptions = {}): Promise<Engine> {
+  if (googleApiKey) return "google-ai-studio";
   if (await ollamaHasModel(ollamaChatModel())) return "ollama";
-  if (googleConfigured()) return "google-ai-studio";
   return "heuristic";
 }

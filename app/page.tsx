@@ -21,7 +21,7 @@ async function Home() {
 function Splash() {
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <p className="font-display text-lg text-slate-400">Loading DeepRetain…</p>
+      <p className="text-sm text-ink-3">Loading…</p>
     </div>
   );
 }

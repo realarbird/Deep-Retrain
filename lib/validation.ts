@@ -34,3 +34,12 @@ export const sampleBodySchema = z.object({
   deck: z.enum(["bio", "cs"]),
   tzOffsetMinutes: tzOffset,
 });
+
+export const aiKeyBodySchema = z.object({
+  apiKey: z
+    .string()
+    .trim()
+    .min(20, "That doesn't look like a full API key")
+    .max(200, "That doesn't look like an API key")
+    .regex(/^[\x21-\x7e]+$/, "API keys don't contain spaces or special characters"),
+});

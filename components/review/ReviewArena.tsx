@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookOpenText, CheckCircle2, CornerDownLeft, HelpCircle, LayoutDashboard } from "lucide-react";
 import type { AppActions } from "@/components/AppShell";
 import { SampleDeckButtons } from "@/components/SampleDeckButtons";
-import { Button, Card, Chip, ErrorNote } from "@/components/ui/primitives";
+import { Button, Card, cx, ErrorNote, inputClass, Tag } from "@/components/ui/primitives";
 import { api, ApiError, formatRelative, formatSeconds, TIER_LABEL, tzOffset, type CapStatus, type DashboardData, type ReviewCard, type ReviewResponse } from "@/lib/client";
 import { ResultPanel } from "./ResultPanel";
 import { RestScreen } from "./RestScreen";
@@ -76,32 +75,32 @@ export function ReviewArena({ data, actions, isDemo }: { data: DashboardData; ac
   // The result panel stays up even if this review used the last slot of the day.
   if (phase !== "result" && data.cap.reached) return <RestScreen cap={data.cap} actions={actions} isDemo={isDemo} />;
 
-  if (!card && phase === "answering") return <CaughtUp data={data} actions={actions} />;
+  if (!card && phase === "answering") return <CaughtUp data={data} actions={actions} isDemo={isDemo} />;
 
   const queueLeft = queue.length;
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-ink-3">
         <span>
-          {queueLeft} due · {data.cap.remaining} of {data.cap.limit} micro-reviews left today
+          {queueLeft} due · {data.cap.remaining} of {data.cap.limit} reviews left today
         </span>
         {card && <Stopwatch elapsedMs={frozenLatency ?? elapsed} frozen={phase !== "answering"} />}
       </div>
 
       {card && (
-        <Card className="p-6 sm:p-8 animate-rise" key={card.id}>
-          <div className="flex flex-wrap items-center gap-2">
-            <Chip tone="indigo">Box {card.leitnerBox}</Chip>
-            <Chip tone="sky">{TIER_LABEL[card.difficultyTier]}</Chip>
+        <Card className="p-6 sm:p-8" key={card.id}>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-ink-3">
+            <Tag>Box {card.leitnerBox}</Tag>
+            <Tag>{TIER_LABEL[card.difficultyTier]}</Tag>
             {card.reviewCount > 0 && (
-              <span className="text-xs text-slate-500">
-                seen {card.reviewCount}×{card.lastLatencyMs ? ` · last ${formatSeconds(card.lastLatencyMs)}` : ""}
+              <span>
+                Seen {card.reviewCount}×{card.lastLatencyMs ? `, last in ${formatSeconds(card.lastLatencyMs)}` : ""}
               </span>
             )}
           </div>
-          <p className="mt-5 text-xs font-medium uppercase tracking-wide text-slate-500">{card.conceptTitle}</p>
-          <h1 className="mt-1 font-display text-2xl leading-snug text-white sm:text-[1.7rem]">{card.question}</h1>
+          <p className="mt-6 text-sm text-ink-2">{card.conceptTitle}</p>
+          <h1 className="mt-1 text-xl font-medium leading-snug text-ink sm:text-2xl">{card.question}</h1>
 
           {phase !== "result" && (
             <form
@@ -123,31 +122,27 @@ export function ReviewArena({ data, actions, isDemo }: { data: DashboardData; ac
                 }}
                 disabled={phase === "grading"}
                 rows={5}
-                placeholder="Explain it in your own words…"
+                placeholder="Explain it in your own words"
                 aria-label="Your answer"
-                className="w-full resize-y rounded-xl bg-slate-950 px-4 py-3 text-[15px] leading-relaxed text-slate-100 ring-1 ring-slate-800 placeholder:text-slate-600 focus:outline-none focus:ring-indigo-400 disabled:opacity-60"
+                className={cx(inputClass, "resize-y px-4 py-3 text-[15px] leading-relaxed")}
               />
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-xs"
-                  disabled={phase === "grading"}
-                  onClick={() => void submit("")}
-                  icon={<HelpCircle className="size-3.5" aria-hidden />}
-                >
+                <Button type="button" variant="ghost" className="text-xs" disabled={phase === "grading"} onClick={() => void submit("")}>
                   I don&apos;t know yet
                 </Button>
-                <Button type="submit" loading={phase === "grading"} disabled={!answer.trim()} icon={<CornerDownLeft className="size-4" aria-hidden />}>
-                  {phase === "grading" ? "Gemma is grading…" : "Submit  ⌘↵"}
-                </Button>
+                <div className="flex items-center gap-3">
+                  <span className="hidden text-xs text-ink-3 sm:inline">Ctrl + Enter</span>
+                  <Button type="submit" loading={phase === "grading"} disabled={!answer.trim()}>
+                    {phase === "grading" ? "Grading…" : "Submit"}
+                  </Button>
+                </div>
               </div>
               {error && <ErrorNote>{error}</ErrorNote>}
             </form>
           )}
 
           {phase === "result" && answer && (
-            <blockquote className="mt-5 border-l-2 border-slate-700 pl-4 text-sm italic text-slate-400">{answer}</blockquote>
+            <blockquote className="mt-5 border-l-2 border-line-strong pl-4 text-sm text-ink-2">{answer}</blockquote>
           )}
         </Card>
       )}
@@ -163,33 +158,44 @@ export function ReviewArena({ data, actions, isDemo }: { data: DashboardData; ac
   );
 }
 
-function CaughtUp({ data, actions }: { data: DashboardData; actions: AppActions }) {
+function CaughtUp({ data, actions, isDemo }: { data: DashboardData; actions: AppActions; isDemo: boolean }) {
   if (data.totals.cards === 0) {
     return (
-      <Card className="mx-auto max-w-2xl p-10 text-center animate-rise">
-        <BookOpenText className="mx-auto size-8 text-indigo-300" aria-hidden />
-        <h1 className="mt-4 font-display text-2xl font-semibold text-white">Nothing to review yet</h1>
-        <p className="mt-2 text-sm text-slate-400">Load a sample deck to try the arena in one click, or ingest your own notes.</p>
-        <SampleDeckButtons actions={actions} className="mt-6 flex flex-wrap justify-center gap-2" />
+      <Card className="mx-auto max-w-xl p-8 sm:p-10">
+        <h1 className="text-xl font-semibold text-ink">Nothing to review yet</h1>
+        {isDemo ? (
+          <>
+            <p className="mt-2 text-sm text-ink-2">Load a sample deck to start.</p>
+            <SampleDeckButtons actions={actions} className="mt-6 flex flex-wrap gap-2" />
+          </>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-ink-2">Add some notes and their cards will show up here.</p>
+            <Button className="mt-6" onClick={() => actions.goTo("ingest")}>
+              Add notes
+            </Button>
+          </>
+        )}
       </Card>
     );
   }
   return (
-    <Card className="mx-auto max-w-2xl p-10 text-center animate-rise">
-      <CheckCircle2 className="mx-auto size-9 text-emerald-300" aria-hidden />
-      <h1 className="mt-4 font-display text-2xl font-semibold text-white">All caught up</h1>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-400">
+    <Card className="mx-auto max-w-xl p-8 sm:p-10">
+      <h1 className="text-xl font-semibold text-ink">All caught up</h1>
+      <p className="mt-2 text-sm leading-relaxed text-ink-2">
         {data.nextDue
-          ? `Your next review, ${data.nextDue.conceptTitle}, unlocks ${formatRelative(data.nextDue.at)}. The gap is the point: forgetting a little makes the next recall stronger.`
-          : "Every concept is resting until its next interval."}
+          ? `Your next review, ${data.nextDue.conceptTitle}, is due ${formatRelative(data.nextDue.at)}. The gap is on purpose: recalling something you've half forgotten is what makes it stick.`
+          : "Every card is waiting for its next interval."}
       </p>
-      <div className="mt-6 flex flex-wrap justify-center gap-2">
-        <Button variant="secondary" onClick={() => actions.goTo("dashboard")} icon={<LayoutDashboard className="size-4" aria-hidden />}>
-          View dashboard
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={() => actions.goTo("dashboard")}>
+          Back to overview
         </Button>
-        <Button variant="ghost" onClick={() => actions.goTo("ingest")} icon={<BookOpenText className="size-4" aria-hidden />}>
-          Ingest more notes
-        </Button>
+        {!isDemo && (
+          <Button variant="ghost" onClick={() => actions.goTo("ingest")}>
+            Add more notes
+          </Button>
+        )}
       </div>
     </Card>
   );
