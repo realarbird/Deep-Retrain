@@ -9,21 +9,26 @@ describe("retentionAt", () => {
 });
 
 describe("buildRetentionCurves", () => {
-  const curves = buildRetentionCurves(30);
+  const curves = buildRetentionCurves();
 
-  it("returns one point per day including day 0", () => {
-    expect(curves.points).toHaveLength(31);
-    expect(curves.points[0]).toMatchObject({ day: 0, cramming: 100, spaced: 100 });
+  it("returns one point per day across six weeks, including day 0", () => {
+    expect(curves.points).toHaveLength(43);
+    expect(curves.points[0]).toMatchObject({ day: 0, spaced: 100 });
   });
 
   it("marks review days at the Leitner cadence", () => {
     expect(curves.reviewDays).toEqual([1, 4, 11, 25]);
   });
 
-  it("keeps spaced retention far above cramming by day 30", () => {
-    const last = curves.points[30];
-    expect(last.cramming).toBeLessThan(5);
-    expect(last.spaced).toBeGreaterThan(60);
+  it("has nothing to recall before the day 28 cram session", () => {
+    expect(curves.cramDay).toBe(28);
+    expect(curves.points.slice(0, 28).every((p) => p.cramming === null)).toBe(true);
+    expect(curves.points[28].cramming).toBe(100);
+  });
+
+  it("lets the cram fade within a week while spaced recall holds", () => {
+    expect(curves.points[35].cramming).toBeLessThan(5);
+    expect(curves.points[42].spaced).toBeGreaterThan(60);
   });
 
   it("restores retention to 100% on review days", () => {

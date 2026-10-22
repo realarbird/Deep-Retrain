@@ -1,10 +1,10 @@
 import { connection, NextResponse } from "next/server";
-import { googleConfigured, googleGemmaModel } from "@/lib/ai/googleAiStudio";
+import { googleModel } from "@/lib/ai/googleAiStudio";
 import { getOllamaStatus, ollamaChatModel, ollamaEmbedModel } from "@/lib/ai/ollama";
 import { ENGINE_LABELS } from "@/lib/ai/types";
 import { auth0Configured } from "@/lib/auth0";
 import { connectDB } from "@/lib/db";
-import { activeEngine } from "@/lib/gemma";
+import { activeEngine } from "@/lib/engine";
 import { demoModeEnabled } from "@/lib/identity";
 
 /** Liveness + dependency report. Always 200 so Render's health check only tracks the web process. */
@@ -36,7 +36,8 @@ export async function GET() {
         chatModelInstalled: ollama.models.some((m) => m.split(":")[0] === ollamaChatModel().split(":")[0]),
         embedModel: ollamaEmbedModel(),
       },
-      googleAiStudio: { configured: googleConfigured(), model: googleGemmaModel() },
+      // Signed-in learners bring their own key; nothing is configured server-side.
+      googleAiStudio: { keys: "per-user", model: googleModel() },
     },
     auth: { auth0: auth0Configured, demoMode: demoModeEnabled() },
   });

@@ -92,35 +92,35 @@ export function Stopwatch({ elapsedMs, frozen }: { elapsedMs: number; frozen?: b
   const c = 2 * Math.PI * r;
 
   return (
-    <div className="flex items-center gap-2 text-xs text-slate-400" aria-live="off">
+    <div className="flex items-center gap-2 text-xs text-ink-3" aria-live="off">
       {hidden ? (
         <span className="inline-flex items-center gap-1.5">
-          <span className={cx("size-1.5 rounded-full", frozen ? "bg-slate-500" : "animate-pulse bg-slate-400")} aria-hidden />
-          Timing quietly
+          <span className={cx("size-1.5 rounded-full bg-ink-3", !frozen && "animate-pulse")} aria-hidden />
+          Timer hidden
         </span>
       ) : (
-        <span className="inline-flex items-center gap-2" title="Response latency. Under 12s with 80%+ accuracy earns a promotion.">
+        <span className="inline-flex items-center gap-2" title={`Answer time. Under ${LATENCY_THRESHOLD_S}s with a score of 80% or more moves the card up a box.`}>
           <svg viewBox="0 0 24 24" className="size-5 -rotate-90" aria-hidden>
-            <circle cx="12" cy="12" r={r} fill="none" stroke="#1e293b" strokeWidth="3" />
+            <circle cx="12" cy="12" r={r} fill="none" stroke="var(--color-line)" strokeWidth="3" />
             <circle
               cx="12"
               cy="12"
               r={r}
               fill="none"
-              stroke={slow ? "#fbbf24" : "#818cf8"}
+              stroke={slow ? "var(--color-warning)" : "var(--color-accent)"}
               strokeWidth="3"
               strokeLinecap="round"
               strokeDasharray={c}
               strokeDashoffset={c * (1 - progress)}
             />
           </svg>
-          <span className={cx("w-12 font-mono tabular-nums", slow ? "text-amber-300" : "text-slate-300")}>{seconds.toFixed(1)}s</span>
+          <span className="w-12 font-mono tabular-nums text-ink-2">{seconds.toFixed(1)}s</span>
         </span>
       )}
       <button
         type="button"
         onClick={toggle}
-        className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+        className="rounded p-1 text-ink-3 hover:bg-sunken hover:text-ink"
         aria-label={hidden ? "Show timer" : "Hide timer"}
         title={hidden ? "Show timer" : "Hide timer (latency is still measured)"}
       >

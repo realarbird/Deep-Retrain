@@ -1,5 +1,5 @@
 /**
- * Offline fallback engine. Used when neither local Ollama nor hosted Gemma is
+ * Offline fallback engine. Used when neither the hosted model nor Ollama is
  * reachable, so the review loop never stalls during a demo. It is deliberately
  * simple: lexical key-point coverage, not semantic understanding.
  */

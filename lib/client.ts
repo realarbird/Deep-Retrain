@@ -29,6 +29,7 @@ export interface CapStatus {
 export interface DashboardData {
   identity: { name: string; mode: "auth0" | "demo"; picture: string | null };
   engine: { id: EngineId; label: string };
+  aiKey: { saved: boolean };
   boxes: { box: number; intervalDays: number; count: number }[];
   totals: {
     cards: number;
@@ -44,7 +45,6 @@ export interface DashboardData {
   nextDue: { at: string; conceptTitle: string } | null;
   latencyTrend: { date: string; avgSeconds: number | null; movingAvgSeconds: number | null; reviews: number }[];
   hasSimulatedHistory: boolean;
-  retention: { points: { day: number; cramming: number; spaced: number }[]; reviewDays: number[] };
   decks: { id: string; title: string; sourceType: "notes" | "sample"; cardCount: number }[];
   recentReviews: {
     id: string;
@@ -98,11 +98,25 @@ export const TIER_LABEL: Record<Tier, string> = {
 };
 
 export const ENGINE_SHORT: Record<string, string> = {
-  ollama: "Gemma 2 · Ollama",
-  "google-ai-studio": "Gemma · AI Studio",
-  heuristic: "Offline engine",
+  ollama: "Gemma 2 (Ollama)",
+  "google-ai-studio": "Gemini Flash-Lite",
+  heuristic: "Offline grader",
   simulated: "Simulated",
 };
+
+/** For sentences: "Graded by Gemini Flash-Lite", "Graded by the offline grader". */
+export function engineName(engine: string): string {
+  return engine === "heuristic" ? "the offline grader" : (ENGINE_SHORT[engine] ?? engine);
+}
+
+export interface AiKeyStatus {
+  saved: boolean;
+  hint: string | null;
+  model: string;
+  verified?: boolean;
+}
+
+export const GOOGLE_KEY_URL = "https://aistudio.google.com/api-keys";
 
 export class ApiError extends Error {
   constructor(

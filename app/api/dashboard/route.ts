@@ -2,10 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { withIdentity } from "@/lib/api";
 import { ENGINE_LABELS } from "@/lib/ai/types";
 import { warmOllama } from "@/lib/ai/ollama";
-import { activeEngine } from "@/lib/gemma";
+import { getGoogleApiKey } from "@/lib/aiKey";
+import { activeEngine } from "@/lib/engine";
 import { BOX_INTERVALS_DAYS } from "@/lib/leitner";
 import { sanitizeTzOffset } from "@/lib/pacer";
-import { buildLatencyTrend, buildRetentionCurves, localDateKey } from "@/lib/retention";
+import { buildLatencyTrend, localDateKey } from "@/lib/retention";
+import { removeSampleDecks } from "@/lib/sampleDecks";
 import { getCapStatus, toReviewCardDTO } from "@/lib/study";
 import { ConceptCard } from "@/models/ConceptCard";
 import { ReviewLog } from "@/models/ReviewLog";
@@ -29,6 +31,10 @@ export const GET = withIdentity(async (identity, request: NextRequest) => {
     },
     { upsert: true },
   );
+
+  // Sample decks belong to Demo Mode. Signed-in learners only study their own notes.
+  if (identity.mode === "auth0") await removeSampleDecks(userId);
+  const googleApiKey = await getGoogleApiKey(identity);
 
   const trendStart = new Date(now.getTime() - (TREND_DAYS + 1) * 86_400_000);
   const [boxAgg, dueCount, dueCards, nextDue, cap, logs, decks, recent, engine] = await Promise.all([
@@ -56,7 +62,7 @@ export const GET = withIdentity(async (identity, request: NextRequest) => {
       .limit(6)
       .select("conceptTitle outcome score responseLatencyMs boxBefore boxAfter reviewedAt engine")
       .lean(),
-    activeEngine(),
+    activeEngine({ googleApiKey }),
   ]);
 
   if (engine === "ollama") warmOllama();
@@ -89,6 +95,7 @@ export const GET = withIdentity(async (identity, request: NextRequest) => {
   return NextResponse.json({
     identity: { name: identity.name, mode: identity.mode, picture: identity.picture },
     engine: { id: engine, label: ENGINE_LABELS[engine] },
+    aiKey: { saved: Boolean(googleApiKey) },
     boxes,
     totals: {
       cards: totalCards,
@@ -104,7 +111,6 @@ export const GET = withIdentity(async (identity, request: NextRequest) => {
     nextDue: nextDue ? { at: nextDue.nextReviewDate.toISOString(), conceptTitle: nextDue.conceptTitle } : null,
     latencyTrend,
     hasSimulatedHistory: logs.some((l) => l.simulated),
-    retention: buildRetentionCurves(30),
     decks: decks.map((d) => ({ id: String(d._id), title: d.title, sourceType: d.sourceType, cardCount: d.cardCount })),
     recentReviews: recent.map((r) => ({
       id: String(r._id),

@@ -1,66 +1,78 @@
 # DeepRetain: The Forgetting-Curve Knowledge Engine
 
-> Study less. Remember more. An anti-cramming study companion built on open-weight **Gemma**.
+> Study less. Remember more. An anti-cramming study app that turns your notes into a few short reviews a day.
 
-DeepRetain turns dense lecture notes into a handful of **micro-reviews a day**. Gemma extracts atomic concepts, then a **latency-aware Leitner system** decides when you see each one again, based on *how accurately* and *how fluently* you recall it. A **daily cognitive cap** stops you before cramming starts. Spacing does the rest while you sleep.
+DeepRetain splits dense lecture notes into single concepts, then a **latency-aware Leitner system** decides when you see each one again, based on *how accurately* and *how fluently* you recall it. A **daily cap** stops you before cramming starts. Spacing does the rest.
 
 Built for the **Hacktoberfest 2026 Open-Source AI Challenge, Week 3: "Slow and Steady"**.
 
 ## The lazy payoff
 
-Cramming feels productive and decays in days. DeepRetain asks for about **15 short answers a day, at most**, and schedules them at the moment you're about to forget. That's when a single recall does the most good. You put in less effort, and you keep the memory longer.
+Cramming feels productive and fades within days. DeepRetain asks for about **15 short answers a day, at most**, and schedules them just before you'd forget. That's when a single recall does the most good.
 
 | What you do | What DeepRetain does |
 |---|---|
-| Paste notes once | Gemma splits them into atomic concepts, key points, and a first question |
-| Answer one card | A quiet stopwatch measures recall latency while Gemma grades meaning, not wording |
+| Paste notes or import a file | The AI splits them into concepts, key points, and a first question |
+| Answer one card | A quiet stopwatch measures recall time while the model grades meaning, not wording |
 | Answer fast and right | The card climbs a Leitner box (1 → 3 → 7 → 14 → 30 days), and the next question gets harder |
-| Answer right but slowly | Hesitation detected: the card stays put and Gemma asks a Socratic follow-up |
-| Answer wrong | Back to Box 1, with a two-sentence analogy that fixes the misconception |
-| Hit 15 reviews | "Memory Consolidation Active". Cramming mode is locked until tomorrow |
+| Answer right but slowly | The card stays put and you get a follow-up question |
+| Answer wrong | Back to box 1, with a two-sentence analogy that fixes the misconception |
+| Hit 15 reviews | Reviews lock until tomorrow |
+
+## Demo vs signed in
+
+| | Demo Mode | Signed in (Auth0) |
+|---|---|---|
+| Decks | The two sample decks only (AP Biology, CS) | Your own notes only. Sample decks are removed |
+| Adding notes | No | Paste, or import `.md`, `.txt`, `.pdf`, `.docx` (up to 5 MB) |
+| Grading | Ollama if the server has it, else the offline grader | Gemini 3.5 Flash-Lite with **your own free key**, then Ollama, then the offline grader |
 
 ## Features
 
-- **Note ingestion and concept chunking.** Gemma 2 turns Markdown notes into `conceptTitle`, `coreFact`, `initialQuestion`, and `expectedKeyPoints`, then embeds each concept as a **384-dim vector** (`all-minilm`) for MongoDB Atlas Vector Search.
-- **Latency-aware Socratic review arena.** One card at a time, with a distraction-free stopwatch (hideable, and it pauses while the tab is hidden). Gemma returns a 0–100 semantic score that is combined with `responseLatencyMs`.
-- **Adaptive difficulty.** Box 1 asks *recall* questions, Box 2 *application*, and Box 3+ *synthesis*. On promotion, Gemma writes the next, harder question, often linking the concept to a related one from your own deck.
-- **Identity-scoped RAG.** Related concepts come from Atlas Vector Search, **pre-filtered by the signed-in Auth0 `sub`** and re-checked before anything reaches the prompt. Gemma never sees another learner's notes.
-- **Anti-cramming pacer.** A daily cognitive cap (default 15) counted on the learner's local day, with a rest screen that explains why spacing beats cramming.
-- **Forgetting-curve dashboard.** Leitner box distribution, a modeled *Cramming vs DeepRetain* retention curve, and a recall-latency trendline with a 7-day average.
-- **Always demo-able.** Demo Mode needs no account, and one click loads an AP Biology or CS deck with three weeks of sample history. If no Gemma endpoint is reachable, an offline engine keeps the loop working.
+- **Bring your own free AI key.** Signed-in learners create a key at [aistudio.google.com/api-keys](https://aistudio.google.com/api-keys) and paste it on the **AI key** tab. The default model, `gemini-3.5-flash-lite`, is Google's lowest-latency free-tier model; grading uses minimal thinking. The server has no key of its own.
+- **Keys are encrypted before they reach Auth0.** The browser sends the key over HTTPS. The server checks it with Google, seals it with AES-256-GCM (key derived from `AUTH0_SECRET` with HKDF, bound to the learner's Auth0 `sub`), and stores only the sealed value in the user's Auth0 `app_metadata` through the Management API. It is never stored in MongoDB and never returned in full.
+- **Note import.** Markdown and text are read as-is; PDFs go through `unpdf` and Word files through `mammoth`. The extracted text lands in the editor to check before cards are made, and the file isn't kept.
+- **Latency-aware review.** One card at a time, with a stopwatch that can be hidden and pauses while the tab is hidden. The model's 0–100 score is combined with `responseLatencyMs`.
+- **Adaptive difficulty.** Box 1 asks *recall* questions, box 2 *application*, box 3+ *synthesis*. On promotion, the model writes the next, harder question, often linking the concept to a related one from your own deck.
+- **Identity-scoped RAG.** Related concepts come from Atlas Vector Search, **pre-filtered by the signed-in Auth0 `sub`** and re-checked before anything reaches the prompt.
+- **Anti-cramming pacer.** A daily cap (default 15) counted on the learner's local day.
+- **Cramming vs DeepRetain** on the sign-in page: modeled recall of one concept over six weeks, where the crammer studies once on **day 28** (the night before an exam) and DeepRetain teaches it on day 0 and reviews it on days 1, 4, 11 and 25. A table under the chart gives the values on exam day and one and two weeks later.
+- **Dashboard.** Leitner box distribution and a recall-time trend with a 7-day average.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
   subgraph Browser
-    UI["Next.js App Router UI<br/>Dashboard · Ingest · Review Arena"]
+    UI["Next.js App Router UI<br/>Overview · Review · Add notes · AI key"]
   end
 
   subgraph Next["Next.js 16 server (Render web service)"]
     P["proxy.ts<br/>Auth0 middleware"]
     ID["lib/identity<br/>Auth0 sub or Demo id"]
-    API["/api/ingest · /api/review<br/>/api/dashboard · /api/sample"]
-    G["lib/gemma.ts<br/>provider chain"]
+    API["/api/ingest · /api/import · /api/review<br/>/api/dashboard · /api/sample · /api/ai-key"]
+    K["lib/aiKey + lib/secretBox<br/>AES-256-GCM seal"]
+    E["lib/engine.ts<br/>provider chain"]
     L["lib/leitner.ts<br/>score + latency → box"]
     R["lib/retrieval.ts<br/>identity-scoped RAG"]
   end
 
-  subgraph AI["Gemma"]
+  subgraph AI["Models"]
+    GS["Google AI Studio<br/>Gemini 3.5 Flash-Lite<br/>(learner's key)"]
     O["Ollama<br/>gemma2:9b + all-minilm"]
-    GS["Google AI Studio<br/>hosted Gemma 4"]
     H["Offline heuristic engine"]
   end
 
   DB[("MongoDB Atlas<br/>conceptcards · reviewlogs<br/>studydecks · userprofiles<br/>+ Vector Search index")]
-  A0["Auth0"]
+  A0["Auth0<br/>login + app_metadata<br/>(sealed AI key)"]
 
   UI -->|fetch| P --> API
   P <-->|/auth/*| A0
   API --> ID
-  API --> G --> O
-  G -.fallback.-> GS
-  G -.fallback.-> H
+  API --> K <-->|Management API, sealed value only| A0
+  API --> E --> GS
+  E -.fallback.-> O
+  E -.fallback.-> H
   API --> L
   API --> R -->|"$vectorSearch filter auth0Id"| DB
   API --> DB
@@ -71,16 +83,16 @@ flowchart LR
 ```mermaid
 sequenceDiagram
   participant U as Learner
-  participant A as Review Arena
+  participant A as Review screen
   participant S as /api/review
   participant V as Atlas Vector Search
-  participant G as Gemma
+  participant G as Gemini (learner's key)
   U->>A: answers (stopwatch running)
   A->>S: cardId, answer, latencyMs
-  S->>S: daily cap check, ownership check
+  S->>S: daily cap check, ownership check, unseal key
   S->>V: related concepts (filter: auth0Id = session sub)
   S->>G: grade vs key points + follow-up material (one call)
-  G-->>S: score, feedback, analogy | Socratic question | harder question
+  G-->>S: score, feedback, analogy | follow-up question | harder question
   S->>S: decideOutcome(score, latency, box)
   S-->>A: outcome, next review date, follow-up
 ```
@@ -90,48 +102,49 @@ sequenceDiagram
 | Accuracy | Latency | Outcome | Box | Next review |
 |---|---|---|---|---|
 | ≥ 80% | < 12s | **Promote** and generate a harder question | +1 (max 5) | 1 / 3 / 7 / 14 / 30 days by new box |
-| ≥ 80% | ≥ 12s | **Hesitation**: Socratic follow-up | unchanged | current box interval |
+| ≥ 80% | ≥ 12s | **Hesitation**: follow-up question | unchanged | current box interval |
 | < 80% | any | **Reset**: two-sentence analogy | 1 | 1 day |
 
 New concepts are due right away for their first recall pass, then follow the box intervals.
 
-### Gemma provider chain (`lib/gemma.ts`)
+### Provider chain (`lib/engine.ts`)
 
-1. **Ollama** (`OLLAMA_BASE_URL`): Gemma 2 with Ollama structured outputs (a JSON schema in `format`). The model is warmed on dashboard load.
-2. **Google AI Studio** (`GEMINI_API_KEY`): hosted Gemma 4 (`gemma-4-26b-a4b-it`) for cloud demos, with a JSON response schema. Grading uses minimal thinking (about 4–5s per answer), and extraction uses high thinking (about 7s per deck) for better coverage. Models that reject these options are retried in plain mode.
-3. **Offline heuristic engine**: lexical key-point coverage plus templated Socratic questions and analogies.
+1. **Google AI Studio with the learner's key**: `gemini-3.5-flash-lite` with a JSON response schema and the default temperature (Gemini 3 is tuned for it). Grading uses minimal thinking; extraction uses low. If the key can't reach that model (HTTP 404) the next one, `gemini-3.1-flash-lite`, is tried. `GOOGLE_AI_MODEL` pins a single model, for example `gemma-4-26b-a4b-it` to stay on open-weight Gemma. A rejected key skips straight to the next engine.
+2. **Ollama** (`OLLAMA_BASE_URL`): Gemma 2 with Ollama structured outputs. Used for Demo Mode and for learners without a key.
+3. **Offline heuristic engine**: lexical key-point coverage plus templated follow-up questions and analogies.
 
-Every response reports the engine that produced it, and the header badge shows which one is active.
+Every response reports the engine that produced it.
 
 ## Tech stack
 
 | Layer | Choice |
 |---|---|
 | Framework | Next.js 16 (App Router, Cache Components, `proxy.ts`), React 19, TypeScript |
-| UI | Tailwind CSS 4, Lucide icons, Recharts 3 |
-| AI | Gemma 2 on Ollama (`gemma2:9b` / `gemma2:2b`), `all-minilm` embeddings, Gemma 4 on Google AI Studio as the hosted fallback |
+| UI | Tailwind CSS 4 with light and dark tokens, IBM Plex Sans/Mono, Lucide icons, Recharts 3 |
+| AI | Gemini 3.5 Flash-Lite on Google AI Studio (learner's key), Gemma 2 on Ollama, `all-minilm` embeddings |
+| Import | `unpdf` (PDF), `mammoth` (Word) |
 | Data | MongoDB Atlas with Mongoose 9 and Atlas Vector Search (384-dim, cosine, filtered by `auth0Id`) |
-| Auth | `@auth0/nextjs-auth0` v4, plus Demo Mode for judges |
+| Auth | `@auth0/nextjs-auth0` v4 plus the Auth0 Management API for the sealed key; Demo Mode for judges |
 | Deploy | Render Blueprint (`render.yaml`) |
-| Tests | Vitest (Leitner rules, retention maths, pacer, JSON parsing, heuristic engine, provider chain, authz guards) |
+| Tests | Vitest (Leitner rules, retention maths, pacer, JSON parsing, heuristic engine, provider chain, key sealing, Auth0 storage, file import, demo/sign-in gates, authz guards) |
 
 ## Run it locally
 
-**Prerequisites:** Node 20.9+, an Atlas cluster (the free M0 works), and [Ollama](https://ollama.com).
+**Prerequisites:** Node 20.9+ and an Atlas cluster (the free M0 works). [Ollama](https://ollama.com) is optional.
 
 ```bash
-ollama pull gemma2:9b       # or gemma2:2b on smaller machines
-ollama pull all-minilm      # 384-dim embeddings
+ollama pull gemma2:9b       # optional: grading without a learner key
+ollama pull all-minilm      # optional: 384-dim embeddings
 ```
 
 ```bash
 npm install
-cp .env.example .env.local  # then fill in MONGODB_URI (Auth0 and Gemini keys are optional)
+cp .env.example .env.local  # then fill in MONGODB_URI (Auth0 is optional)
 npm run db:vector-index     # creates the Atlas Vector Search index and waits until it is READY
 npm run dev                 # http://localhost:3000
 ```
 
-Open the app, click **Try Demo Mode**, then **Load Sample AP Biology Deck**. Answer quickly and correctly to see a promotion, take more than 12 seconds to trigger a Socratic follow-up, or answer wrong to get an analogy.
+Open the app and click **Try the demo**, then pick a sample deck. Answer quickly and correctly to see a promotion, take more than 12 seconds to get a follow-up question, or answer wrong to get an analogy. To add your own notes, sign in and save your AI key on the **AI key** tab.
 
 ### Scripts
 
@@ -156,24 +169,30 @@ Without the index, retrieval falls back to in-app cosine similarity over the sam
 1. Create a **Regular Web Application**.
 2. Allowed Callback URL: `https://<your-app>/auth/callback`. Allowed Logout URL: `https://<your-app>`.
 3. Set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and `AUTH0_SECRET` (`openssl rand -hex 32`).
+4. **Let the app store learners' AI keys.** In the Auth0 dashboard, open **Applications → APIs → Auth0 Management API → Machine to Machine Applications**, authorize your application, and grant `read:users` and `update:users_app_metadata`. Make sure **Client Credentials** is enabled under the application's **Advanced Settings → Grant Types**. To use a separate machine-to-machine app instead, set `AUTH0_MANAGEMENT_CLIENT_ID` and `AUTH0_MANAGEMENT_CLIENT_SECRET`. If `AUTH0_DOMAIN` is a custom domain, set `AUTH0_MANAGEMENT_DOMAIN` to the tenant's `*.auth0.com` domain.
 
-When these are missing, the app runs in Demo Mode only and hides the sign-in button.
+When the Auth0 variables are missing, the app runs in Demo Mode only and hides sign-in.
 
-### Hosted Gemma fallback (optional)
-Add a free Google AI Studio key as `GEMINI_API_KEY`. `GOOGLE_GEMMA_MODEL` picks the Gemma model served there (default `gemma-4-26b-a4b-it`; `gemma-4-31b-it` also works). To see which Gemma models your key can use, list `https://generativelanguage.googleapis.com/v1beta/models`.
+`AUTH0_SECRET` also derives the key that seals learners' AI keys. Rotating it signs everyone out and means they need to paste their key again.
+
+### Learner AI keys
+Nothing to configure on the server. Each learner:
+1. Goes to [aistudio.google.com/api-keys](https://aistudio.google.com/api-keys) and signs in with a Google account.
+2. Chooses **Create API key** (the free tier needs no billing).
+3. Pastes it on DeepRetain's **AI key** tab. The page tells them the key will be sent encrypted.
+
+Free-tier keys have rate limits; when a learner hits one, grading falls back to Ollama or the offline grader until it resets. On the free tier Google may use prompts to improve its products, and the settings page says so.
 
 ## Deploy to Render
 
 1. Push this repository to GitHub.
 2. In Render, choose **New → Blueprint**, select the repo, and Render reads [`render.yaml`](render.yaml).
 3. Fill in the prompted secrets. `MONGODB_URI` is required, the rest are optional. `AUTH0_SECRET` is generated for you, and `APP_BASE_URL` defaults to Render's external URL.
-4. Add `https://<service>.onrender.com/auth/callback` to your Auth0 application.
-
-**Showing live Gemma 2 on the cloud deploy:** Render has no GPU, so either set `GEMINI_API_KEY` (hosted Gemma) or expose your local Ollama with a tunnel (for example `cloudflared tunnel --url http://localhost:11434`) and set `OLLAMA_BASE_URL` to the tunnel URL.
+4. Add `https://<service>.onrender.com/auth/callback` to your Auth0 application, and authorize it for the Management API (step 4 above).
 
 ## Demo Mode
 
-**Try Demo Mode** sets an httpOnly cookie with a random `demo|<uuid>` learner id, so every judge gets an isolated workspace. That id format can never collide with or impersonate an `auth0|…` user. **Reset** wipes the demo learner's data, and **Exit** clears the cookie. Set `DEMO_MODE_ENABLED=false` to turn it off.
+**Try the demo** sets an httpOnly cookie with a random `demo|<uuid>` learner id, so every judge gets an isolated workspace. That id format can never collide with or impersonate an `auth0|…` user. Demo Mode only offers the sample decks: `/api/ingest` and `/api/import` refuse demo learners, and there is no AI key, so grading uses Ollama if the server has it and the offline grader otherwise. **Reset** wipes the demo learner's data, and **Exit** clears the cookie. Set `DEMO_MODE_ENABLED=false` to turn it off.
 
 Sample decks include three weeks of **simulated** review history so the charts have a trend to show. Those logs are flagged `simulated: true`, labeled in the UI, and never count toward the daily cap.
 
@@ -181,12 +200,14 @@ Sample decks include three weeks of **simulated** review history so the charts h
 
 | Route | Purpose |
 |---|---|
-| `POST /api/ingest` | `{ deckTitle, rawText }` → Gemma extraction → embeddings → cards in Box 1 |
-| `POST /api/review` | `{ mode: "answer", cardId, answer, latencyMs, tzOffsetMinutes }` → grade, Leitner move, log. `{ mode: "followup", reviewLogId, answer }` → Socratic reply |
-| `GET /api/dashboard?tz=` | Due cards, box stats, cap status, latency trend, retention curves |
-| `POST /api/sample` | `{ deck: "bio" \| "cs" }` → curated sample deck |
+| `POST /api/ingest` | Signed in only. `{ deckTitle, rawText }` → extraction → embeddings → cards in box 1 |
+| `POST /api/import` | Signed in only. Multipart `file` (`.md`, `.txt`, `.pdf`, `.docx`, ≤ 5 MB) → `{ title, text, truncated }`. Nothing is stored |
+| `GET/PUT/DELETE /api/ai-key` | Signed in only. Key status (`saved`, `hint`, `model`), save `{ apiKey }` (verified with Google, sealed, stored in Auth0), or remove |
+| `POST /api/review` | `{ mode: "answer", cardId, answer, latencyMs, tzOffsetMinutes }` → grade, Leitner move, log. `{ mode: "followup", reviewLogId, answer }` → follow-up reply |
+| `GET /api/dashboard?tz=` | Due cards, box stats, cap status, latency trend, AI key status. Removes sample decks from signed-in accounts |
+| `POST /api/sample` | Demo Mode only. `{ deck: "bio" \| "cs" }` → curated sample deck |
 | `POST/DELETE /api/demo` | Enter Demo Mode, or reset it (`?exit=1` to leave) |
-| `GET /api/health` | Mongo, Ollama, AI Studio, and Auth0 status (Render health check) |
+| `GET /api/health` | Mongo, Ollama, model, and Auth0 status (Render health check) |
 
 All data routes resolve the caller first and scope every query by `auth0Id`.
 
@@ -194,22 +215,26 @@ All data routes resolve the caller first and scope every query by `auth0Id`.
 
 ```
 app/                 App Router pages and API routes
-components/          AppShell, Landing, dashboard charts, ingest editor, review arena
-lib/gemma.ts         extractConceptsFromNotes · evaluateAndFollowUp · replyToFollowUp
-lib/ai/              Ollama / Google AI Studio / heuristic providers, prompts, embeddings
+components/          AppShell, Landing, charts, dashboard, ingest editor, review, AI key settings
+lib/engine.ts        extractConceptsFromNotes · evaluateAndFollowUp · replyToFollowUp
+lib/ai/              Google AI Studio / Ollama / heuristic providers, prompts, embeddings
+lib/aiKey.ts         Learner AI keys: load, save, remove (sealed, stored in Auth0)
+lib/secretBox.ts     AES-256-GCM sealing
+lib/auth0Management.ts  Minimal Management API client (app_metadata)
+lib/importNotes.ts   Text from .md / .txt / .pdf / .docx
 lib/leitner.ts       Box rules (accuracy × latency)
 lib/retrieval.ts     Identity-scoped Atlas Vector Search
 lib/retention.ts     Forgetting-curve and latency-trend maths
-lib/pacer.ts         Daily cognitive cap
+lib/pacer.ts         Daily cap
 models/              ConceptCard · ReviewLog · StudyDeck · UserProfile
 scripts/             Atlas vector index setup
 tests/               Vitest suites
 render.yaml          Render Blueprint
 ```
 
-## Notes on the charts
+## Notes on the design
 
-Chart colors were checked with a colorblind-safety validator against the dark slate surface: emerald `#059669` and orange `#d95926` for the two retention curves, and indigo `#6366f1` for single-series charts. Every multi-series chart has a legend, and every chart has hover tooltips.
+The UI uses warm neutral surfaces, hairline borders and one accent color, with separate light and dark values defined as tokens in `app/globals.css`. Chart series colors were checked with a colorblind-safety validator against both chart surfaces: blue `#2a78d6` / `#3987e5` for DeepRetain and single-series charts, and orange `#eb6834` / `#d95926` for cramming. Every multi-series chart has a legend and hover tooltips, and the retention chart has a table of its key values.
 
 ## License
 

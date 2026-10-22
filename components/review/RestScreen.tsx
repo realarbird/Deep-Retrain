@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart3, Moon, RotateCcw } from "lucide-react";
 import type { AppActions } from "@/components/AppShell";
 import { Button, Card } from "@/components/ui/primitives";
 import type { CapStatus } from "@/lib/client";
@@ -23,42 +22,33 @@ export function RestScreen({ cap, actions, isDemo }: { cap: CapStatus; actions: 
   }, [cap.resetsAt]);
 
   return (
-    <Card className="mx-auto max-w-2xl overflow-hidden animate-rise">
-      <div className="bg-gradient-to-b from-indigo-500/15 to-transparent px-6 pb-2 pt-10 text-center sm:px-10">
-        <Moon className="mx-auto size-10 text-indigo-200" aria-hidden />
-        <h1 className="mt-4 font-display text-3xl font-semibold text-white">Memory Consolidation Active</h1>
-        <p className="mt-2 text-sm text-slate-400">
-          You&apos;ve done all {cap.limit} micro-reviews for today. Cramming mode is locked.
+    <Card className="mx-auto max-w-xl p-8 sm:p-10">
+      <h1 className="text-xl font-semibold text-ink">That&apos;s today&apos;s {cap.limit} reviews</h1>
+      <p className="mt-2 text-sm text-ink-2">The rest wait until tomorrow. New reviews open in</p>
+      <p className="mt-3 font-mono text-3xl tabular-nums text-ink" aria-label="Time until reviews open again">
+        {left}
+      </p>
+
+      <div className="mt-8 space-y-3 border-t border-line pt-6 text-sm leading-relaxed text-ink-2">
+        <p>
+          <span className="font-medium text-ink">Why stop here?</span> Each extra review in one sitting adds less than the
+          one before. The same time spread over several days is worth more, because every gap makes you rebuild the memory.
         </p>
-        <p className="mt-6 font-mono text-4xl tabular-nums text-indigo-100" aria-label="Time until the cap resets">
-          {left}
+        <p>
+          <span className="font-medium text-ink">Sleep helps.</span> Overnight, the brain replays what you studied and moves
+          it into long-term memory. The break is part of the learning.
         </p>
-        <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">until tomorrow&apos;s reviews unlock</p>
       </div>
 
-      <div className="space-y-4 px-6 py-8 text-sm leading-relaxed text-slate-300 sm:px-10">
-        <p>
-          <strong className="text-slate-100">Why stop now?</strong> Each extra review today adds less and less. The
-          <em> spacing effect</em> is one of the most replicated results in learning science: the same study time spread
-          across days beats one long session, because every gap forces your brain to rebuild the memory.
-        </p>
-        <p>
-          <strong className="text-slate-100">What happens tonight.</strong> During slow-wave sleep your hippocampus replays
-          today&apos;s material and hands it to long-term cortical storage. Rest isn&apos;t a break from learning; it&apos;s
-          the part where memories become durable.
-        </p>
-        <p className="text-slate-400">Slow and steady: a few minutes a day, and the forgetting curve flattens on its own.</p>
-
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Button variant="secondary" onClick={() => actions.goTo("dashboard")} icon={<BarChart3 className="size-4" aria-hidden />}>
-            See my forgetting curve
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={() => actions.goTo("dashboard")}>
+          Back to overview
+        </Button>
+        {isDemo && (
+          <Button variant="ghost" onClick={actions.resetDemo}>
+            Reset the demo
           </Button>
-          {isDemo && (
-            <Button variant="ghost" onClick={actions.resetDemo} icon={<RotateCcw className="size-4" aria-hidden />}>
-              Judges: reset demo to try again
-            </Button>
-          )}
-        </div>
+        )}
       </div>
     </Card>
   );

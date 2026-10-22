@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { readJson, withIdentity } from "@/lib/api";
+import { HttpError, readJson, withIdentity } from "@/lib/api";
 import { seedSampleDeck } from "@/lib/sampleDecks";
 import { sampleBodySchema } from "@/lib/validation";
 
-/** One-click sample deck (AP Biology or CS) with a few cards due immediately. */
+/** One-click sample deck (AP Biology or CS) with a few cards due immediately. Demo Mode only. */
 export const POST = withIdentity(async (identity, request: Request) => {
+  if (identity.mode !== "demo") throw new HttpError(403, "Sample decks are only available in Demo Mode.");
   const { deck, tzOffsetMinutes } = sampleBodySchema.parse(await readJson(request));
   const seeded = await seedSampleDeck(identity, deck, tzOffsetMinutes);
   return NextResponse.json({ ...seeded, deckId: String(seeded.deckId) }, { status: 201 });

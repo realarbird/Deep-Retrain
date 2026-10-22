@@ -1,5 +1,5 @@
 /**
- * Forgetting-curve maths for the dashboard.
+ * Forgetting-curve maths.
  *
  * Ebbinghaus-style exponential decay R(t) = e^(-t / S), where S is memory
  * stability in days. Each spaced review restores recall and multiplies S.
@@ -8,8 +8,12 @@
 export const CRAM_STABILITY_DAYS = 2;
 export const SPACED_INITIAL_STABILITY_DAYS = 1.2;
 export const STABILITY_GROWTH = 2.5;
-/** Cumulative review days implied by Box intervals 1, 3, 7, 14. */
-export const SPACED_REVIEW_DAYS = [1, 4, 11, 25];
+/** Cumulative review days implied by Box intervals 1, 3, 7, 14, 30. */
+export const SPACED_REVIEW_DAYS = [1, 4, 11, 25, 55];
+/** The crammer studies once, the night before an exam on day 28. */
+export const CRAM_DAY = 28;
+/** Long enough to show what each plan leaves two weeks after the exam. */
+export const RETENTION_CHART_DAYS = 42;
 
 export function retentionAt(daysSince: number, stabilityDays: number): number {
   return Math.exp(-daysSince / stabilityDays);
@@ -17,17 +21,20 @@ export function retentionAt(daysSince: number, stabilityDays: number): number {
 
 export interface RetentionPoint {
   day: number;
-  cramming: number;
+  /** Null before the cram session: nothing has been studied yet. */
+  cramming: number | null;
   spaced: number;
 }
 
-export function buildRetentionCurves(days = 30): { points: RetentionPoint[]; reviewDays: number[] } {
+/** Modeled recall of one concept: crammed once on `cramDay`, versus learned on day 0 and reviewed at the Leitner cadence. */
+export function buildRetentionCurves(
+  days = RETENTION_CHART_DAYS,
+  cramDay = CRAM_DAY,
+): { points: RetentionPoint[]; reviewDays: number[]; cramDay: number } {
   const reviewDays = SPACED_REVIEW_DAYS.filter((d) => d <= days);
   const points: RetentionPoint[] = [];
 
   for (let day = 0; day <= days; day++) {
-    const cramming = retentionAt(day, CRAM_STABILITY_DAYS);
-
     let stability = SPACED_INITIAL_STABILITY_DAYS;
     let lastReview = 0;
     for (const r of reviewDays) {
@@ -36,16 +43,15 @@ export function buildRetentionCurves(days = 30): { points: RetentionPoint[]; rev
         stability *= STABILITY_GROWTH;
       }
     }
-    const spaced = retentionAt(day - lastReview, stability);
 
     points.push({
       day,
-      cramming: round1(cramming * 100),
-      spaced: round1(spaced * 100),
+      cramming: day < cramDay ? null : round1(retentionAt(day - cramDay, CRAM_STABILITY_DAYS) * 100),
+      spaced: round1(retentionAt(day - lastReview, stability) * 100),
     });
   }
 
-  return { points, reviewDays };
+  return { points, reviewDays, cramDay };
 }
 
 export interface LatencyLog {

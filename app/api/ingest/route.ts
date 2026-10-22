@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { embedTexts, embeddingText } from "@/lib/ai/embeddings";
+import { getGoogleApiKey } from "@/lib/aiKey";
 import { HttpError, readJson, withIdentity } from "@/lib/api";
-import { extractConceptsFromNotes } from "@/lib/gemma";
+import { extractConceptsFromNotes } from "@/lib/engine";
 import { toReviewCardDTO } from "@/lib/study";
 import { ingestBodySchema } from "@/lib/validation";
 import { ConceptCard } from "@/models/ConceptCard";
@@ -9,11 +10,12 @@ import { StudyDeck } from "@/models/StudyDeck";
 
 export const maxDuration = 300;
 
-/** Chunk raw notes into atomic concepts with Gemma, embed them, and store them in Leitner Box 1. */
+/** Chunk raw notes into atomic concepts, embed them, and store them in Leitner Box 1. Signed-in learners only. */
 export const POST = withIdentity(async (identity, request: Request) => {
+  if (identity.mode !== "auth0") throw new HttpError(403, "Demo Mode only uses the sample decks. Sign in to add your own notes.");
   const { deckTitle, rawText } = ingestBodySchema.parse(await readJson(request));
 
-  const { concepts, engine } = await extractConceptsFromNotes(rawText);
+  const { concepts, engine } = await extractConceptsFromNotes(rawText, { googleApiKey: await getGoogleApiKey(identity) });
   if (!concepts.length) {
     throw new HttpError(422, "No concepts could be extracted. Try notes with clearer headings or full sentences.");
   }

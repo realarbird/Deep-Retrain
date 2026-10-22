@@ -2,30 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpenText, LayoutDashboard, LogOut, RotateCcw, Swords, TimerReset } from "lucide-react";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { IngestEditor } from "@/components/ingest/IngestEditor";
 import { ReviewArena } from "@/components/review/ReviewArena";
-import { Button, Chip, cx, ErrorNote, ProgressBar } from "@/components/ui/primitives";
-import { api, tzOffset, type CapStatus, type DashboardData, type EngineId } from "@/lib/client";
+import { AiKeySettings } from "@/components/settings/AiKeySettings";
+import { Wordmark } from "@/components/Wordmark";
+import { Button, cx, ErrorNote, ProgressBar } from "@/components/ui/primitives";
+import { api, engineName, tzOffset, type CapStatus, type DashboardData } from "@/lib/client";
 
-export type Tab = "dashboard" | "ingest" | "review";
+export type Tab = "dashboard" | "ingest" | "review" | "settings";
+type Mode = "auth0" | "demo";
 
-const TABS: { id: Tab; label: string; short: string; icon: typeof LayoutDashboard }[] = [
-  { id: "dashboard", label: "Dashboard", short: "Dashboard", icon: LayoutDashboard },
-  { id: "ingest", label: "Ingest Notes", short: "Ingest", icon: BookOpenText },
-  { id: "review", label: "Review Arena", short: "Review", icon: Swords },
+/** Demo Mode is sample decks only; adding notes and the AI key need an account. */
+const TABS: { id: Tab; label: string; modes: Mode[] }[] = [
+  { id: "dashboard", label: "Overview", modes: ["auth0", "demo"] },
+  { id: "review", label: "Review", modes: ["auth0", "demo"] },
+  { id: "ingest", label: "Add notes", modes: ["auth0"] },
+  { id: "settings", label: "AI key", modes: ["auth0"] },
 ];
-
-const ENGINE_TONE: Record<EngineId, { dot: string; short: string; hint: string }> = {
-  ollama: { dot: "bg-emerald-400", short: "Gemma 2 · local", hint: "Gemma 2 is running on Ollama." },
-  "google-ai-studio": { dot: "bg-indigo-400", short: "Gemma · hosted", hint: "Local Ollama is offline; using hosted Gemma on Google AI Studio." },
-  heuristic: {
-    dot: "bg-amber-400",
-    short: "Offline engine",
-    hint: "No Gemma endpoint is reachable, so the offline heuristic engine is grading. Reviews still work.",
-  },
-};
 
 export interface AppActions {
   refresh: () => Promise<void>;
@@ -36,7 +30,7 @@ export interface AppActions {
   sampleLoading: "bio" | "cs" | null;
 }
 
-export function AppShell({ user }: { user: { name: string; mode: "auth0" | "demo"; picture: string | null } }) {
+export function AppShell({ user }: { user: { name: string; mode: Mode; picture: string | null } }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [data, setData] = useState<DashboardData | null>(null);
@@ -81,7 +75,7 @@ export function AppShell({ user }: { user: { name: string; mode: "auth0" | "demo
   );
 
   const resetDemo = useCallback(async () => {
-    if (!window.confirm("Reset all Demo Mode decks and review history?")) return;
+    if (!window.confirm("Reset the demo? This clears the sample decks and your review history.")) return;
     setResetting(true);
     try {
       await api("/api/demo", { method: "DELETE" });
@@ -113,83 +107,63 @@ export function AppShell({ user }: { user: { name: string; mode: "auth0" | "demo
 
   const actions: AppActions = { refresh, goTo, loadSample, setCap, resetDemo, sampleLoading };
   const cap = data?.cap;
-  const engine = data?.engine;
+  const tabs = TABS.filter((t) => t.modes.includes(user.mode));
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3 sm:px-6 xl:flex-nowrap">
-          <div className="flex items-center gap-2.5">
-            <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
-              <rect width="32" height="32" rx="8" fill="#0f172a" />
-              <path d="M6 9c6 0 7 14 20 14" fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round" />
-              <path d="M6 9c3 0 4 4 6 7" fill="none" stroke="#6366f1" strokeWidth="3" strokeLinecap="round" />
-              <circle cx="26" cy="23" r="2.5" fill="#059669" />
-            </svg>
-            <span className="font-display text-lg font-semibold text-white">DeepRetain</span>
-          </div>
+      <header className="sticky top-0 z-20 border-b border-line bg-page/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-2 px-4 pt-3 sm:px-6 md:flex-nowrap md:pt-0">
+          <Wordmark />
 
-          <nav aria-label="Sections" className="scrollbar-none order-3 -mx-1 flex w-full gap-1 overflow-x-auto xl:order-none xl:w-auto xl:shrink-0">
-            {TABS.map(({ id, label, short, icon: Icon }) => (
+          <nav aria-label="Sections" className="scrollbar-none order-3 -mx-1 flex w-full gap-1 overflow-x-auto md:order-none md:w-auto">
+            {tabs.map(({ id, label }) => (
               <button
                 key={id}
                 onClick={() => goTo(id)}
                 aria-current={tab === id ? "page" : undefined}
                 className={cx(
-                  "inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                  tab === id ? "bg-slate-800 text-white ring-1 ring-slate-700" : "text-slate-400 hover:text-slate-100",
+                  "-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-2 py-3 text-sm transition-colors md:py-4",
+                  tab === id ? "border-ink font-medium text-ink" : "border-transparent text-ink-2 hover:text-ink",
                 )}
               >
-                <Icon className="size-4" aria-hidden />
-                <span className="sm:hidden">{short}</span>
-                <span className="hidden sm:inline">{label}</span>
+                {label}
                 {id === "review" && data && data.totals.dueNow > 0 && (
-                  <span className="rounded-full bg-indigo-500 px-1.5 text-[11px] font-semibold text-white">{data.totals.dueNow}</span>
+                  <span className="font-mono text-xs text-ink-3">{data.totals.dueNow}</span>
                 )}
               </button>
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-4 text-sm">
             {cap && (
-              <div className="hidden w-28 sm:block" title="Daily cognitive cap: micro-reviews done today">
-                <div className="mb-1 flex items-center justify-between text-[11px] text-slate-400">
-                  <span className="inline-flex items-center gap-1">
-                    <TimerReset className="size-3" aria-hidden /> Today
-                  </span>
-                  <span className="font-mono text-slate-300">
+              <div className="hidden w-24 sm:block" title="Reviews done today, out of the daily limit">
+                <div className="mb-1 flex justify-between text-xs text-ink-3">
+                  <span>Today</span>
+                  <span className="font-mono tabular-nums text-ink-2">
                     {cap.used}/{cap.limit}
                   </span>
                 </div>
-                <ProgressBar value={cap.used} max={cap.limit} tone={cap.reached ? "amber" : "indigo"} label="Daily micro-reviews used" />
+                <ProgressBar value={cap.used} max={cap.limit} tone={cap.reached ? "warning" : "accent"} label="Reviews done today" />
               </div>
             )}
-            {engine && (
-              <span title={`${engine.label}. ${ENGINE_TONE[engine.id].hint}`} className="hidden items-center gap-2 whitespace-nowrap text-xs text-slate-400 md:inline-flex">
-                <span className={cx("size-2 rounded-full", ENGINE_TONE[engine.id].dot)} aria-hidden />
-                {ENGINE_TONE[engine.id].short}
-              </span>
+            {user.mode === "demo" ? (
+              <div className="flex items-center gap-1">
+                <span className="mr-1 text-xs text-ink-3">Demo</span>
+                <Button variant="ghost" className="px-2 py-1 text-xs" onClick={resetDemo} loading={resetting}>
+                  Reset
+                </Button>
+                <Button variant="ghost" className="px-2 py-1 text-xs" onClick={exitDemo}>
+                  Exit
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className="hidden max-w-36 truncate text-ink-2 sm:inline">{user.name}</span>
+                <a href="/auth/logout" className="text-xs text-ink-2 hover:text-ink">
+                  Log out
+                </a>
+              </div>
             )}
-            <div className="flex items-center gap-2">
-              {user.mode === "demo" ? (
-                <>
-                  <Chip tone="amber">Demo</Chip>
-                  <Button variant="ghost" className="px-2 py-1 text-xs" onClick={resetDemo} loading={resetting} icon={<RotateCcw className="size-3.5" aria-hidden />}>
-                    Reset
-                  </Button>
-                  <Button variant="ghost" className="px-2 py-1 text-xs" onClick={exitDemo} icon={<LogOut className="size-3.5" aria-hidden />}>
-                    Exit
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <span className="max-w-32 truncate text-sm text-slate-300">{user.name}</span>
-                  <a href="/auth/logout" className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white">
-                    <LogOut className="size-3.5" aria-hidden /> Log out
-                  </a>
-                </>
-              )}
-            </div>
           </div>
         </div>
       </header>
@@ -200,10 +174,24 @@ export function AppShell({ user }: { user: { name: string; mode: "auth0" | "demo
             <ErrorNote>{error}</ErrorNote>
           </div>
         )}
-        {!data && !error && <p className="py-20 text-center text-slate-400">Loading your memory map…</p>}
-        {data && tab === "dashboard" && <Dashboard data={data} actions={actions} />}
-        {data && tab === "ingest" && <IngestEditor actions={actions} />}
+        {!data && !error && <p className="py-20 text-center text-sm text-ink-3">Loading…</p>}
+        {data && tab === "dashboard" && <Dashboard data={data} actions={actions} isDemo={user.mode === "demo"} />}
+        {data && tab === "ingest" && user.mode === "auth0" && <IngestEditor actions={actions} hasAiKey={data.aiKey.saved} />}
         {data && tab === "review" && <ReviewArena data={data} actions={actions} isDemo={user.mode === "demo"} />}
+        {data && tab === "settings" && user.mode === "auth0" && <AiKeySettings onChange={refresh} />}
+        {data && tab !== "review" && (
+          <p className="mt-12 text-xs text-ink-3" title={data.engine.label}>
+            Answers are graded by {engineName(data.engine.id)}
+            {data.engine.id === "heuristic" && user.mode === "auth0" && !data.aiKey.saved && (
+              <>
+                {" · "}
+                <button className="underline underline-offset-2 hover:text-ink" onClick={() => goTo("settings")}>
+                  add your AI key
+                </button>
+              </>
+            )}
+          </p>
+        )}
       </main>
     </div>
   );
