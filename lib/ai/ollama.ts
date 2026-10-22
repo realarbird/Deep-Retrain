@@ -1,4 +1,4 @@
-/** Local / self-hosted Gemma 2 via the Ollama REST API. */
+/** Local / self-hosted Gemma 4 via the Ollama REST API. */
 
 const STATUS_TTL_MS = 30_000;
 const PROBE_TIMEOUT_MS = 1_500;
@@ -17,7 +17,7 @@ export function ollamaBaseUrl(): string | null {
 }
 
 export function ollamaChatModel(): string {
-  return process.env.OLLAMA_MODEL?.trim() || "gemma2:9b";
+  return process.env.OLLAMA_MODEL?.trim() || "gemma4:e4b";
 }
 
 export function ollamaEmbedModel(): string {

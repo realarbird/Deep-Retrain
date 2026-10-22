@@ -2,18 +2,21 @@
  * Hosted model through the Google AI Studio (Gemini API) `generateContent`
  * endpoint, called with the signed-in learner's own free API key.
  *
- * The default, Gemini 3.5 Flash-Lite, is the lowest-latency model on the free
- * tier. Requests send a system instruction, JSON mode with a response schema,
- * and a thinking level (minimal for grading). Models that reject those options
- * get a retry in plain mode, and a model the key can't reach (HTTP 404) hands
- * over to the next one in the list. Both are remembered for this process.
+ * The default, Gemma 4 26B A4B, is an open model (Apache 2.0) that AI Studio
+ * serves for free. It is a mixture of experts that runs about 4B parameters per
+ * token, so it answers quickly; the dense Gemma 4 31B is the fallback.
+ * Requests send a system instruction, JSON mode with a response schema, and a
+ * thinking level (minimal, which turns Gemma's thinking off, for grading).
+ * Models that reject those options get a retry in plain mode, and a model the
+ * key can't reach (HTTP 404) hands over to the next one in the list. Both are
+ * remembered for this process.
  */
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const RETRY_DELAY_MS = 1_200;
 
-export const DEFAULT_GOOGLE_MODEL = "gemini-3.5-flash-lite";
-const FALLBACK_GOOGLE_MODELS = ["gemini-3.1-flash-lite"];
+export const DEFAULT_GOOGLE_MODEL = "gemma-4-26b-a4b-it";
+const FALLBACK_GOOGLE_MODELS = ["gemma-4-31b-it"];
 
 /** `model|thinkingLevel` combinations that rejected structured options. */
 const plainModeKeys = new Set<string>();
@@ -45,6 +48,11 @@ function usesDefaultTemperature(model: string): boolean {
   return /^gemini-([3-9]|\d{2})/.test(model);
 }
 
+/** Gemma only has thinking off (`minimal`) or on (`high`), so `low` runs with it off. */
+function thinkingLevelFor(model: string, level: ThinkingLevel): ThinkingLevel {
+  return /^gemma-/.test(model) && level === "low" ? "minimal" : level;
+}
+
 function buildBody(
   model: string,
   system: string,
@@ -70,7 +78,7 @@ function buildBody(
       maxOutputTokens: maxTokens,
       responseMimeType: "application/json",
       ...(jsonSchema ? { responseJsonSchema: jsonSchema } : {}),
-      thinkingConfig: { thinkingLevel },
+      thinkingConfig: { thinkingLevel: thinkingLevelFor(model, thinkingLevel) },
     },
   };
 }

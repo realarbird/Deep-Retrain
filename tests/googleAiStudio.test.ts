@@ -20,7 +20,7 @@ describe("googleGenerateJson", () => {
     vi.unstubAllGlobals();
   });
 
-  it("calls Gemini 3.5 Flash-Lite with the learner's key, JSON mode and minimal thinking, and drops thought parts", async () => {
+  it("calls Gemma 4 26B A4B with the learner's key, JSON mode and thinking off, and drops thought parts", async () => {
     const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
       json({
         candidates: [
@@ -33,25 +33,38 @@ describe("googleGenerateJson", () => {
 
     expect(await googleGenerateJson("SYSTEM", "USER", { apiKey: "learner-key" })).toBe('{"score":90}');
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toContain("/models/gemini-3.5-flash-lite:generateContent");
+    expect(url).toContain("/models/gemma-4-26b-a4b-it:generateContent");
     expect(new Headers(init?.headers).get("x-goog-api-key")).toBe("learner-key");
     const body = JSON.parse(String(init?.body));
     expect(body.systemInstruction.parts[0].text).toBe("SYSTEM");
     expect(body.generationConfig.responseMimeType).toBe("application/json");
     expect(body.generationConfig.thinkingConfig).toEqual({ thinkingLevel: "minimal" });
-    // Gemini 3+ keeps its default temperature.
-    expect(body.generationConfig.temperature).toBeUndefined();
+    expect(body.generationConfig.temperature).toBe(0.2);
   });
 
-  it("sends a temperature to a pinned non-Gemini-3 model", async () => {
-    vi.stubEnv("GOOGLE_AI_MODEL", "gemma-4-26b-a4b-it");
+  it("keeps Gemma's thinking off when a task asks for low thinking", async () => {
     const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => OK("{}"));
     vi.stubGlobal("fetch", fetchMock);
     const { googleGenerateJson } = await load();
 
-    await googleGenerateJson("S", "U", { apiKey: "k", temperature: 0.2 });
-    expect(fetchMock.mock.calls[0][0]).toContain("/models/gemma-4-26b-a4b-it:");
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).generationConfig.temperature).toBe(0.2);
+    await googleGenerateJson("S", "U", { apiKey: "k", thinkingLevel: "low" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).generationConfig.thinkingConfig).toEqual({
+      thinkingLevel: "minimal",
+    });
+  });
+
+  it("leaves the temperature and thinking level alone for a pinned Gemini 3 model", async () => {
+    vi.stubEnv("GOOGLE_AI_MODEL", "gemini-3.5-flash-lite");
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => OK("{}"));
+    vi.stubGlobal("fetch", fetchMock);
+    const { googleGenerateJson } = await load();
+
+    await googleGenerateJson("S", "U", { apiKey: "k", temperature: 0.2, thinkingLevel: "low" });
+    expect(fetchMock.mock.calls[0][0]).toContain("/models/gemini-3.5-flash-lite:");
+    const config = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).generationConfig;
+    // Gemini 3+ keeps its default temperature.
+    expect(config.temperature).toBeUndefined();
+    expect(config.thinkingConfig).toEqual({ thinkingLevel: "low" });
   });
 
   it("falls back to plain mode when a model rejects the structured options", async () => {
@@ -71,14 +84,14 @@ describe("googleGenerateJson", () => {
   it("tries the next model when the default one is not available", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(json({ error: { message: "models/gemini-3.5-flash-lite is not found" } }, 404))
+      .mockResolvedValueOnce(json({ error: { message: "models/gemma-4-26b-a4b-it is not found" } }, 404))
       .mockResolvedValueOnce(OK('{"ok":2}'));
     vi.stubGlobal("fetch", fetchMock);
     const { googleGenerateJson, googleModel } = await load();
 
     expect(await googleGenerateJson("S", "U", { apiKey: "k" })).toBe('{"ok":2}');
-    expect(fetchMock.mock.calls[1][0]).toContain("/models/gemini-3.1-flash-lite:");
-    expect(googleModel()).toBe("gemini-3.1-flash-lite");
+    expect(fetchMock.mock.calls[1][0]).toContain("/models/gemma-4-31b-it:");
+    expect(googleModel()).toBe("gemma-4-31b-it");
   });
 
   it("reports a rejected key without retrying", async () => {

@@ -35,7 +35,7 @@ function googleReply(body: unknown) {
 describe("AI provider chain", () => {
   beforeEach(() => {
     vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
-    vi.stubEnv("OLLAMA_MODEL", "gemma2:9b");
+    vi.stubEnv("OLLAMA_MODEL", "gemma4:e4b");
     vi.stubEnv("GOOGLE_AI_MODEL", "");
   });
   afterEach(() => {
@@ -45,7 +45,7 @@ describe("AI provider chain", () => {
 
   it("uses Ollama when it is up and promotes a fast accurate answer", async () => {
     const fetchMock = vi.fn(async (url: string) => {
-      if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma2:9b" }] });
+      if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma4:e4b" }] });
       if (url.endsWith("/api/chat")) return jsonResponse({ message: { content: JSON.stringify(EVAL) } });
       throw new Error(`unexpected ${url}`);
     });
@@ -68,7 +68,7 @@ describe("AI provider chain", () => {
       "fetch",
       vi.fn(async (url: string) =>
         url.endsWith("/api/tags")
-          ? jsonResponse({ models: [{ name: "gemma2:9b" }] })
+          ? jsonResponse({ models: [{ name: "gemma4:e4b" }] })
           : jsonResponse({ message: { content: JSON.stringify(EVAL) } }),
       ),
     );
@@ -86,7 +86,7 @@ describe("AI provider chain", () => {
       "fetch",
       vi.fn(async (url: string) =>
         url.endsWith("/api/tags")
-          ? jsonResponse({ models: [{ name: "gemma2:9b" }] })
+          ? jsonResponse({ models: [{ name: "gemma4:e4b" }] })
           : jsonResponse({ message: { content: JSON.stringify(longAnalogy) } }),
       ),
     );
@@ -114,7 +114,7 @@ describe("AI provider chain", () => {
 
   it("never calls Google without a learner key", async () => {
     const fetchMock = vi.fn(async (url: string) => {
-      if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma2:9b" }] });
+      if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma4:e4b" }] });
       if (url.endsWith("/api/chat")) return jsonResponse({ message: { content: JSON.stringify(EVAL) } });
       throw new Error(`unexpected ${url}`);
     });
@@ -130,7 +130,7 @@ describe("AI provider chain", () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes("generativelanguage.googleapis.com"))
         return jsonResponse({ error: { message: "API key not valid. Please pass a valid API key.", status: "INVALID_ARGUMENT" } }, 400);
-      if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma2:9b" }] });
+      if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma4:e4b" }] });
       if (url.endsWith("/api/chat")) return jsonResponse({ message: { content: JSON.stringify(EVAL) } });
       throw new Error(`unexpected ${url}`);
     });
@@ -163,7 +163,7 @@ describe("AI provider chain", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
-        if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma2:9b" }] });
+        if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma4:e4b" }] });
         if (url.endsWith("/api/chat")) return jsonResponse({ message: { content: "not json at all" } });
         return jsonResponse({ error: "quota" }, 429);
       }),
@@ -198,7 +198,7 @@ describe("AI provider chain", () => {
       "fetch",
       vi.fn(async (url: string) =>
         url.endsWith("/api/tags")
-          ? jsonResponse({ models: [{ name: "gemma2:9b" }] })
+          ? jsonResponse({ models: [{ name: "gemma4:e4b" }] })
           : jsonResponse({ message: { content: JSON.stringify(extraction) } }),
       ),
     );
@@ -219,7 +219,7 @@ describe("AI provider chain", () => {
       "fetch",
       vi.fn(async (url: string) =>
         url.endsWith("/api/tags")
-          ? jsonResponse({ models: [{ name: "gemma2:9b" }] })
+          ? jsonResponse({ models: [{ name: "gemma4:e4b" }] })
           : jsonResponse({ message: { content: JSON.stringify(concepts) } }),
       ),
     );

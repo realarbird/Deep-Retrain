@@ -63,8 +63,8 @@ export function AiKeySettings({ onChange }: { onChange: () => Promise<void> }) {
           title="AI key"
           subtitle={
             <>
-              Reviews and note extraction run on Google&apos;s {status ? <span className="font-mono text-[13px]">{status.model}</span> : "Gemini Flash-Lite"},
-              a fast model that&apos;s free to use with your own API key.
+              Reviews and note extraction run on {status ? <span className="font-mono text-[13px]">{status.model}</span> : "Gemma 4"},
+              Google&apos;s open Gemma 4 model (Apache 2.0). It&apos;s fast and free to use with your own API key.
             </>
           }
         />

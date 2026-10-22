@@ -2,8 +2,8 @@
  * DeepRetain's AI service.
  *
  * Every task runs through a provider chain so the study loop never stalls:
- *   1. Gemini on Google AI Studio, with the signed-in learner's own key
- *   2. Gemma 2 on Ollama (local or self-hosted, OLLAMA_BASE_URL)
+ *   1. Gemma 4 on Google AI Studio, with the signed-in learner's own key
+ *   2. Gemma 4 on Ollama (local or self-hosted, OLLAMA_BASE_URL)
  *   3. An offline heuristic engine
  * Each result reports which engine produced it.
  */

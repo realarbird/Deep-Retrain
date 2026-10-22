@@ -2,7 +2,7 @@ import { connection, NextResponse } from "next/server";
 import { googleModel } from "@/lib/ai/googleAiStudio";
 import { getOllamaStatus, ollamaChatModel, ollamaEmbedModel } from "@/lib/ai/ollama";
 import { ENGINE_LABELS } from "@/lib/ai/types";
-import { auth0Configured } from "@/lib/auth0";
+import { auth0Configured, authBaseUrl } from "@/lib/auth0";
 import { connectDB } from "@/lib/db";
 import { activeEngine } from "@/lib/engine";
 import { demoModeEnabled } from "@/lib/identity";
@@ -39,6 +39,7 @@ export async function GET() {
       // Signed-in learners bring their own key; nothing is configured server-side.
       googleAiStudio: { keys: "per-user", model: googleModel() },
     },
-    auth: { auth0: auth0Configured, demoMode: demoModeEnabled() },
+    // The URL Auth0 redirects back to, so a deploy can confirm it is not localhost.
+    auth: { auth0: auth0Configured, baseUrl: auth0Configured ? (authBaseUrl() ?? null) : null, demoMode: demoModeEnabled() },
   });
 }

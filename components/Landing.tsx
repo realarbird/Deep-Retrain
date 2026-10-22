@@ -96,7 +96,7 @@ export function Landing({ auth0Enabled, demoEnabled }: { auth0Enabled: boolean; 
               <div>
                 <dt className="font-medium text-ink">Signed in</dt>
                 <dd className="mt-0.5 text-ink-2">
-                  Add your own notes, by pasting or importing a file. Grading uses Gemini Flash-Lite with your own free key
+                  Add your own notes, by pasting or importing a file. Grading uses Gemma 4, an open model, with your own free key
                   from <TextLink href="https://aistudio.google.com/api-keys">Google AI Studio</TextLink>. The key is
                   encrypted before it&apos;s sent to Auth0.
                 </dd>
@@ -116,8 +116,9 @@ export function Landing({ auth0Enabled, demoEnabled }: { auth0Enabled: boolean; 
           <Card className="p-5 sm:p-6">
             <h2 className="text-[15px] font-semibold text-ink">Cramming vs DeepRetain</h2>
             <p className="mb-4 mt-1 text-sm text-ink-2">
-              How much of one concept you&apos;d recall over six weeks. One student crams the night before the exam on day
-              28. The other learns it on day 0 and reviews it four times.
+              How much of one concept you&apos;d recall over six weeks. One student crams for an exam on day 28, then
+              crams again on day 40, the night before the AP Exam on day 41. The other learns it on day 0 and reviews it
+              four times.
             </p>
             <RetentionCurveChart />
           </Card>

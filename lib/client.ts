@@ -98,13 +98,13 @@ export const TIER_LABEL: Record<Tier, string> = {
 };
 
 export const ENGINE_SHORT: Record<string, string> = {
-  ollama: "Gemma 2 (Ollama)",
-  "google-ai-studio": "Gemini Flash-Lite",
+  ollama: "Gemma 4 (Ollama)",
+  "google-ai-studio": "Gemma 4",
   heuristic: "Offline grader",
   simulated: "Simulated",
 };
 
-/** For sentences: "Graded by Gemini Flash-Lite", "Graded by the offline grader". */
+/** For sentences: "Graded by Gemma 4", "Graded by the offline grader". */
 export function engineName(engine: string): string {
   return engine === "heuristic" ? "the offline grader" : (ENGINE_SHORT[engine] ?? engine);
 }
