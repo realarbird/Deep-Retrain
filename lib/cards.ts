@@ -33,6 +33,8 @@ export interface CardRow {
   lapses: number;
   lastScore: number | null;
   suspended: boolean;
+  /** Due now (and not suspended), as of when the list was loaded. */
+  due: boolean;
   /** Estimated recall right now, 0–100, or null if never reviewed. */
   recall: number | null;
 }
@@ -54,6 +56,7 @@ export function toCardRow(c: CardRowSource, now = new Date()): CardRow {
     lapses: c.lapses ?? 0,
     lastScore: c.lastScore ?? null,
     suspended: Boolean(c.suspended),
+    due: !c.suspended && new Date(c.nextReviewDate).getTime() <= now.getTime(),
     recall: recall === null ? null : Math.round(recall * 100),
   };
 }

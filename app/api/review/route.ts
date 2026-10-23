@@ -10,6 +10,7 @@ import { applyExamWindow } from "@/lib/examPlan";
 import type { Identity } from "@/lib/identity";
 import { decideOutcome, MODE_RULES, selfRatingScore, type OutcomeResult, type SelfRating, type StudyMode } from "@/lib/leitner";
 import { cardSourceHash, resolvePractice, type Sibling } from "@/lib/practice";
+import { capStatus } from "@/lib/pacer";
 import { syncProgressNow } from "@/lib/progressSync";
 import { findRelatedConcepts, assertOwnership, type RelatedHit, type RetrievalMethod } from "@/lib/retrieval";
 import {
@@ -156,7 +157,9 @@ async function handleGraded(identity: Identity, body: GradedReviewBody, request:
     });
   }
 
-  const cap = await getCapStatus(identity.userId, tz, now, capBefore.limit);
+  // The response is stored for replays before the log is written, so count this review in.
+  const counted = await getCapStatus(identity.userId, tz, now, capBefore.limit);
+  const cap = capStatus(counted.used + 1, counted.limit, new Date(counted.resetsAt));
   const logId = new mongoose.Types.ObjectId();
   const response = {
     reviewLogId: String(logId),

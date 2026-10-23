@@ -99,6 +99,8 @@ describe("POST /api/review", () => {
     expect(r.body.result).toMatchObject({ mode: "write", outcome: "promote", newBox: 2, engine: "heuristic" });
     expect(card(cardId(0))).toMatchObject({ leitnerBox: 2, reviewCount: 1 });
     expect(logs()[0]).toMatchObject({ mode: "write", device: { kind: "phone", label: "Safari on iPhone" }, capLimit: 15 });
+    // The cap sent back already counts this review.
+    expect(r.body.cap).toMatchObject({ used: 1, remaining: 14, reached: false });
   });
 
   it("grades multiple choice against the answer key, with no network", async () => {

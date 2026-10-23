@@ -1,16 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import type { AppActions } from "@/components/AppShell";
 import { Button, Card, cx, ErrorNote, inputClass, SectionTitle, Tag } from "@/components/ui/primitives";
-import { api, ApiError, engineName, type EngineId, type ReviewCard } from "@/lib/client";
+import { api, ApiError, engineName, formatRelative, type EngineId, type ReviewCard } from "@/lib/client";
 import { MAX_IMPORT_BYTES, MAX_IMPORT_MB } from "@/lib/importLimits";
 
 const MAX_CHARS = 20_000;
 const ACCEPT = ".md,.markdown,.txt,.pdf,.docx";
 
-const EXAMPLE_NOTES = `# The Science of Learning — Lecture 4
+const EXAMPLE_NOTES = `# The Science of Learning, Lecture 4
 
 ## The Spacing Effect
 Information is retained far longer when study sessions are spread out over time rather than massed together.
@@ -42,6 +42,98 @@ interface ImportResult {
   truncated: boolean;
 }
 
+interface Draft {
+  title: string;
+  text: string;
+  updatedAt: string;
+  deviceLabel: string;
+}
+
+const DRAFT_DELAY_MS = 1_500;
+
+/**
+ * The notes in the editor are saved to your account as you type, so you can
+ * paste on a laptop and finish on a phone. If another device saved a newer
+ * draft meanwhile, you choose which one to keep.
+ */
+function useSyncedDraft(title: string, notes: string, load: (d: Draft) => void) {
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [conflict, setConflict] = useState<Draft | null>(null);
+  const base = useRef<string | null>(null);
+  const ready = useRef(false);
+  /** Set when the editor is filled from a draft, so that fill isn't saved straight back. */
+  const skipNext = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api<{ draft: Draft | null }>("/api/draft")
+      .then(({ draft }) => {
+        if (cancelled) return;
+        base.current = draft?.updatedAt ?? null;
+        if (draft) {
+          skipNext.current = true;
+          load(draft);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        ready.current = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Load once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const save = useCallback(async (force = false) => {
+    setStatus("saving");
+    try {
+      const r = await api<{ draft: Draft | null }>("/api/draft", {
+        method: "PUT",
+        json: { title, text: notes, baseUpdatedAt: base.current, force },
+      });
+      base.current = r.draft?.updatedAt ?? null;
+      setConflict(null);
+      setStatus("saved");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setConflict(err.body.draft as Draft);
+        setStatus("idle");
+      } else {
+        setStatus("error");
+      }
+    }
+  }, [title, notes]);
+
+  useEffect(() => {
+    if (!ready.current || conflict) return;
+    if (skipNext.current) {
+      skipNext.current = false;
+      return;
+    }
+    const t = window.setTimeout(() => void save(), DRAFT_DELAY_MS);
+    return () => window.clearTimeout(t);
+  }, [title, notes, conflict, save]);
+
+  return {
+    status,
+    conflict,
+    keepMine: () => void save(true),
+    takeTheirs: () => {
+      if (!conflict) return;
+      base.current = conflict.updatedAt;
+      skipNext.current = true;
+      load(conflict);
+      setConflict(null);
+    },
+    cleared: () => {
+      base.current = null;
+      skipNext.current = true;
+    },
+  };
+}
+
 export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAiKey: boolean }) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -52,6 +144,12 @@ export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAi
   const [importNote, setImportNote] = useState<string | null>(null);
   const [result, setResult] = useState<IngestResult | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [draftNote, setDraftNote] = useState<string | null>(null);
+  const draft = useSyncedDraft(title, notes, (d) => {
+    setTitle(d.title);
+    setNotes(d.text);
+    setDraftNote(`Picked up your draft${d.deviceLabel ? ` from ${d.deviceLabel}` : ""}, saved ${formatRelative(d.updatedAt)}.`);
+  });
 
   async function extract() {
     setLoading(true);
@@ -63,6 +161,11 @@ export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAi
         json: { deckTitle: title.trim() || "Untitled notes", rawText: notes },
       });
       setResult(r);
+      // The server clears the draft once the notes are cards.
+      draft.cleared();
+      setTitle("");
+      setNotes("");
+      setDraftNote(null);
       await actions.refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -114,7 +217,7 @@ export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAi
         <Card className="p-5 sm:p-6">
           <SectionTitle
             title="Add notes"
-            subtitle="Paste or import lecture notes. Each idea becomes a card that starts in box 1."
+            subtitle="Paste or import lecture notes. Each idea becomes a card that starts in box 1. Your draft is kept in your account until you make the cards."
             action={
               <div className="flex gap-1">
                 <Button variant="ghost" className="px-2 py-1 text-xs" onClick={fillExample}>
@@ -189,8 +292,11 @@ export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAi
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <span className="font-mono text-xs tabular-nums text-ink-3">
+            <span className="text-xs tabular-nums text-ink-3">
               {notes.length.toLocaleString()} / {MAX_CHARS.toLocaleString()}
+              {draft.status === "saving" && " · saving draft…"}
+              {draft.status === "saved" && notes && " · draft saved to your account"}
+              {draft.status === "error" && " · draft not saved"}
             </span>
             <Button onClick={extract} loading={loading} disabled={notes.trim().length < 80 || importing}>
               {loading ? "Reading your notes…" : "Create cards"}
@@ -204,6 +310,20 @@ export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAi
                   : "No AI key saved, so the offline extractor will split your notes by heading."}
               </p>
             )}
+            {draftNote && !importNote && <p className="text-sm text-ink-2">{draftNote}</p>}
+            {draft.conflict && (
+              <div className="flex flex-wrap items-center gap-2 rounded-[4px] bg-sunken px-3 py-2 text-sm text-ink-2">
+                <span>
+                  A newer draft was saved{draft.conflict.deviceLabel ? ` from ${draft.conflict.deviceLabel}` : ""} {formatRelative(draft.conflict.updatedAt)}.
+                </span>
+                <Button variant="secondary" className="px-2 py-1 text-xs" onClick={draft.takeTheirs}>
+                  Load that one
+                </Button>
+                <Button variant="ghost" className="px-2 py-1 text-xs" onClick={draft.keepMine}>
+                  Keep mine
+                </Button>
+              </div>
+            )}
             {importNote && <p className="text-sm text-ink-2">{importNote}</p>}
             {error && <ErrorNote>{error}</ErrorNote>}
           </div>
@@ -211,15 +331,16 @@ export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAi
 
         <div className="space-y-6 text-sm leading-relaxed text-ink-2">
           <section>
-            <h3 className="font-medium text-ink">What works well</h3>
+            <h3 className="font-serif text-[17px] font-medium text-ink">What works well</h3>
             <ul className="mt-2 list-disc space-y-1.5 pl-5 marker:text-ink-3">
               <li>One heading per idea helps find where each concept starts and ends.</li>
               <li>Full sentences work better than short fragments.</li>
               <li>Up to 12 cards are made per deck, so reviews stay short.</li>
+              <li>After the cards are made, Gemma writes quiz versions of each one (multiple choice, fill the gap, true or false) in the background.</li>
             </ul>
           </section>
           <section>
-            <h3 className="font-medium text-ink">Importing files</h3>
+            <h3 className="font-serif text-[17px] font-medium text-ink">Importing files</h3>
             <p className="mt-2">
               Markdown, plain text, PDF and Word (.docx) files up to {MAX_IMPORT_MB} MB. The text is pulled out so you can
               check it before making cards; the file itself isn&apos;t kept. Scanned PDFs have no text layer and need OCR
@@ -228,7 +349,7 @@ export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAi
           </section>
           {!hasAiKey && (
             <section>
-              <h3 className="font-medium text-ink">No AI key yet</h3>
+              <h3 className="font-serif text-[17px] font-medium text-ink">No AI key yet</h3>
               <p className="mt-2">
                 Without a key, cards are made by a simple offline extractor.{" "}
                 <button className="text-accent-text underline underline-offset-2" onClick={() => actions.goTo("settings")}>
@@ -246,7 +367,7 @@ export function IngestEditor({ actions, hasAiKey }: { actions: AppActions; hasAi
           <SectionTitle
             title={`${result.cards.length} cards added to “${result.deck.title}”`}
             subtitle={`Made by ${engineName(result.engine)}.`}
-            action={<Button onClick={() => actions.goTo("review")}>Review now</Button>}
+            action={<Button onClick={() => actions.startStudy({})}>Study them now</Button>}
           />
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {result.cards.map((c) => (

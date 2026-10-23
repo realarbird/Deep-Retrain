@@ -3,26 +3,60 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { RetentionCurveChart } from "@/components/charts/RetentionCurveChart";
+import { IndexCard } from "@/components/notebook/IndexCard";
+import { CircledScore, PenTick, Squiggle, Tortoise } from "@/components/notebook/Doodles";
+import { RedPen } from "@/components/notebook/RedPen";
 import { Wordmark } from "@/components/Wordmark";
 import { api } from "@/lib/client";
-import { Button, buttonClass, Card, ErrorNote, TextLink } from "@/components/ui/primitives";
+import { Button, buttonClass, Card, ErrorNote, Kicker, TextLink } from "@/components/ui/primitives";
 
-const STEPS = [
+const WAYS = [
   {
-    title: "Add your notes",
-    body: "Paste them or import a Markdown, text, PDF or Word file. The AI splits them into single ideas, each with a question and the points a good answer should cover.",
+    when: "Tired? Tap.",
+    modes: [
+      ["Multiple choice", "pick one of four"],
+      ["True or false", "one statement, two buttons"],
+      ["Flip", "think of it, flip the card, say how it went"],
+    ],
   },
   {
-    title: "Answer one question at a time",
-    body: "Your answer is graded on meaning, not wording, and the app notes how long you took. Quick and correct moves the card to a longer interval.",
+    when: "A word or a sentence",
+    modes: [
+      ["Fill the gap", "type the one missing word"],
+      ["Write", "answer in your own words"],
+      ["Say it", "answer out loud"],
+    ],
   },
   {
-    title: "Get help where you hesitate",
-    body: "A correct but slow answer gets a follow-up question. A wrong one gets a short analogy and goes back to tomorrow's pile.",
+    when: "Make it stick",
+    modes: [["Teach it back", "explain it to someone who's never heard of it"]],
   },
   {
-    title: "Stop after 15",
-    body: "There's a daily limit, so you can't cram. Each card comes back after 1, 3, 7, 14 and then 30 days.",
+    when: "Hands-free",
+    modes: [["Listen", "it reads the question, waits, then reads the answer"]],
+  },
+] as const;
+
+const FAQ = [
+  {
+    q: "Why can't I do more than fifteen a day?",
+    a: "Because the sixteenth review in one sitting is worth much less than the first review tomorrow. Spacing is the whole trick. You can lower the limit any time, or raise it to 25, but a raise only starts the next day.",
+  },
+  {
+    q: "What does the AI actually do?",
+    a: "Gemma 4, an open-weight model from Google (Apache 2.0), turns your notes into cards, writes the multiple-choice, fill-the-gap and true-or-false versions, marks written and spoken answers on meaning rather than wording, and explains a missed card another way when you ask. The quick modes are checked against an answer key, and Flip and Listen go by your own rating. Only answers Gemma has marked can move a card into the last box.",
+  },
+  {
+    q: "Do I have to pay for anything?",
+    a: "No. Gemma runs on Google AI Studio with your own free key, or on your own machine through Ollama. With neither, a simple offline grader keeps things going.",
+  },
+  {
+    q: "Can I use it on my phone and my laptop?",
+    a: "Yes. Your settings, the devices you use and a progress summary are kept in your Auth0 account, and your cards and history are stored under that same account. Sign in on any device and carry on. It can be installed to your home screen too.",
+  },
+  {
+    q: "What happens to my notes?",
+    a: "The text is pulled out of the file, you check it, and it becomes cards in your account. The file itself isn't kept. On Google's free tier, prompts may be used to improve their products, so keep private things out of your notes.",
   },
 ];
 
@@ -57,25 +91,30 @@ export function Landing({ auth0Enabled, demoEnabled }: { auth0Enabled: boolean; 
       </header>
 
       <main className="mx-auto max-w-5xl px-4 sm:px-6">
-        <section className="grid gap-10 py-12 sm:py-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-14">
+        <section className="grid gap-12 py-12 sm:py-16 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-14">
           <div>
-            <h1 className="text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl">
-              Study a few minutes a day. Still know it next month.
+            <Kicker>A study notebook that does the remembering</Kicker>
+            <h1 className="mt-3 text-balance font-serif text-[2rem] font-medium leading-[1.12] text-ink min-[380px]:text-[2.4rem] sm:text-5xl">
+              Study a few minutes a day.{" "}
+              <span className="relative inline-block whitespace-nowrap">
+                Still know it in June.
+                <Squiggle className="absolute -bottom-2 left-0 h-3 w-full" />
+              </span>
             </h1>
-            <p className="mt-4 text-base leading-relaxed text-ink-2">
-              DeepRetain turns your notes into short questions and brings each one back just before you&apos;d forget it.
-              How quickly you answer counts as much as whether you&apos;re right, so ideas you only half-remember come back
-              sooner.
+            <p className="mt-6 text-[17px] leading-relaxed text-ink-2">
+              DeepRetain turns your notes into short questions and brings each one back just before you&apos;d forget it. Answer
+              quickly and correctly and a card waits longer. Hesitate or miss, and it comes back sooner. There&apos;s a daily
+              limit, so you can&apos;t cram even if you try.
             </p>
 
-            <div className="mt-7 flex flex-wrap items-center gap-3">
+            <div className="mt-8 flex flex-wrap items-center gap-3">
               {auth0Enabled && (
                 <>
-                  <a href="/auth/login" className={buttonClass("primary", "px-4")}>
+                  <a href="/auth/login" className={buttonClass("primary", "px-5")}>
                     Sign in
                   </a>
                   <a href="/auth/login?screen_hint=signup" className={buttonClass("secondary", "px-4")}>
-                    Create an account
+                    Make an account
                   </a>
                 </>
               )}
@@ -86,64 +125,132 @@ export function Landing({ auth0Enabled, demoEnabled }: { auth0Enabled: boolean; 
               )}
             </div>
             {!auth0Enabled && <p className="mt-3 text-sm text-ink-3">Sign-in isn&apos;t set up on this deployment yet.</p>}
+            {demoEnabled && <p className="mt-3 text-sm text-ink-3">The demo needs no account: two sample decks, three weeks of made-up history, an exam coming up.</p>}
             {error && (
               <div className="mt-4">
                 <ErrorNote>{error}</ErrorNote>
               </div>
             )}
-
-            <dl className="mt-8 space-y-3 border-t border-line pt-6 text-sm">
-              <div>
-                <dt className="font-medium text-ink">Signed in</dt>
-                <dd className="mt-0.5 text-ink-2">
-                  Add your own notes, by pasting or importing a file. Grading uses Gemma 4, an open model, with your own free key
-                  from <TextLink href="https://aistudio.google.com/api-keys">Google AI Studio</TextLink>. The key is
-                  encrypted before it&apos;s sent to Auth0.
-                </dd>
-              </div>
-              {demoEnabled && (
-                <div>
-                  <dt className="font-medium text-ink">Demo</dt>
-                  <dd className="mt-0.5 text-ink-2">
-                    No account needed. You get two sample decks, AP Biology and Computer Science, graded by a simple offline
-                    grader.
-                  </dd>
-                </div>
-              )}
-            </dl>
           </div>
 
-          <Card className="p-5 sm:p-6">
-            <h2 className="text-[15px] font-semibold text-ink">Cramming vs DeepRetain</h2>
-            <p className="mb-4 mt-1 text-sm text-ink-2">
-              How much of one concept you&apos;d recall over six weeks. One student crams for an exam on day 28, then
-              crams again on day 40, the night before the AP Exam on day 41. The other learns it on day 0 and reviews it
-              four times.
-            </p>
-            <RetentionCurveChart />
-          </Card>
+          <div className="relative lg:pt-6">
+            <IndexCard
+              className="rotate-[0.6deg]"
+              header={
+                <>
+                  <span>AP Biology</span>
+                  <span>Box 2 · Application</span>
+                </>
+              }
+            >
+              <Kicker>Glycolysis</Kicker>
+              <p className="font-serif text-xl leading-7 text-ink">Sprinting muscles run short of oxygen but still make some ATP. Which pathway keeps going, and why?</p>
+              <p className="pen mt-7 text-[1.45rem] leading-7 text-ink-2" style={{ color: "var(--color-ink-2)" }}>
+                Glycolysis, in the cytoplasm. It doesn&apos;t need oxygen, as long as NAD+ is recycled.
+              </p>
+            </IndexCard>
+            <div className="mt-3 flex items-center justify-end gap-3 pr-2">
+              <PenTick className="h-7 w-8" />
+              <CircledScore value="94" />
+              <RedPen rotate={-3}>6.2s, up to box 3</RedPen>
+            </div>
+            <span className="sr-only">Example: a correct answer in 6.2 seconds scores 94 and moves the card up to box 3.</span>
+          </div>
         </section>
 
-        <section className="border-t border-line py-12">
-          <h2 className="text-xl font-semibold text-ink">How it works</h2>
-          <ol className="mt-6 grid gap-x-10 gap-y-6 sm:grid-cols-2">
-            {STEPS.map(({ title, body }, i) => (
-              <li key={title} className="grid grid-cols-[2rem_1fr]">
-                <span className="font-mono text-sm text-ink-3">{String(i + 1).padStart(2, "0")}</span>
-                <div>
-                  <h3 className="font-medium text-ink">{title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-ink-2">{body}</p>
-                </div>
-              </li>
+        <section className="border-t border-line py-14">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+            <div>
+              <h2 className="font-serif text-3xl font-medium text-ink">The hare crams. The tortoise reviews.</h2>
+              <p className="mt-4 text-[15px] leading-relaxed text-ink-2">
+                Two students learn the same idea. One crams the night before a class exam on day 28, then crams again the night before
+                the AP Exam on day 41. The other learns it on day 0 and reviews it four times, each a little later than the last.
+              </p>
+              <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
+                By AP Exam morning the crammer remembers about a sixth of it. The tortoise still has most of it, after less total time.
+              </p>
+              <div className="mt-6 flex items-end gap-3">
+                <Tortoise className="h-14 w-24" />
+                <RedPen className="mb-2">slow and steady</RedPen>
+              </div>
+            </div>
+            <Card className="p-5 sm:p-6">
+              <RetentionCurveChart />
+            </Card>
+          </div>
+        </section>
+
+        <section className="border-t border-line py-14">
+          <h2 className="font-serif text-3xl font-medium text-ink">Nine ways to study, depending on the day</h2>
+          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-2">
+            Every one of them counts toward the same daily limit and moves cards the same way. Auto picks for you: quick taps while a card
+            is new, typing once you know it.
+          </p>
+          <div className="mt-8 grid gap-x-12 gap-y-8 sm:grid-cols-2">
+            {WAYS.map((group) => (
+              <div key={group.when}>
+                <Kicker className="mb-2">{group.when}</Kicker>
+                <ul className="space-y-2">
+                  {group.modes.map(([name, what]) => (
+                    <li key={name} className="flex items-baseline gap-2 text-[15px]">
+                      <span className="font-medium text-ink">{name}</span>
+                      <span className="leader" aria-hidden />
+                      <span className="text-right text-ink-2">{what}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ol>
+          </div>
+        </section>
+
+        <section className="border-t border-line py-14">
+          <div className="grid gap-8 lg:grid-cols-2">
+            <div>
+              <h2 className="font-serif text-3xl font-medium text-ink">One account, every device</h2>
+              <p className="mt-4 text-[15px] leading-relaxed text-ink-2">
+                Start a session on the bus, finish it at your desk. Your settings, the devices you study on and a summary of your
+                progress live in your Auth0 account. Your cards and every answer are stored under that same account in MongoDB Atlas.
+                Your AI key is encrypted before it ever reaches Auth0.
+              </p>
+            </div>
+            <div className="space-y-4 text-[15px] leading-relaxed text-ink-2">
+              <h2 className="font-serif text-3xl font-medium text-ink">Numbers worth looking at</h2>
+              <p>
+                A calendar of study days, how often you&apos;re right and how fast, what&apos;s coming up against your limit, how much
+                you&apos;d remember right now, which cards keep slipping, and how many reviews the schedule saved you.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-t border-line py-14">
+          <h2 className="font-serif text-3xl font-medium text-ink">Questions people ask</h2>
+          <div className="mt-6 divide-y divide-line border-y border-line">
+            {FAQ.map((f) => (
+              <details key={f.q} className="group py-4">
+                <summary className="cursor-pointer list-none text-[16px] font-medium text-ink marker:hidden">
+                  <span className="mr-2 inline-block text-ink-3 transition-transform group-open:rotate-90">›</span>
+                  {f.q}
+                </summary>
+                <p className="mt-2 max-w-3xl pl-5 text-[15px] leading-relaxed text-ink-2">{f.a}</p>
+              </details>
+            ))}
+          </div>
         </section>
       </main>
 
       <footer className="border-t border-line">
-        <p className="mx-auto max-w-5xl px-4 py-6 text-xs text-ink-3 sm:px-6">
-          DeepRetain is open source under the MIT license. Built with Next.js, MongoDB Atlas, Auth0 and Google AI Studio.
-        </p>
+        <div className="mx-auto max-w-5xl space-y-1 px-4 py-6 text-xs text-ink-3 sm:px-6">
+          <p>
+            DeepRetain is open source under the MIT license. Built for the Hacktoberfest 2026 Open-Source AI Challenge, week three:
+            Slow and Steady.
+          </p>
+          <p>
+            Answers are marked by <TextLink href="https://ai.google.dev/gemma">Gemma 4</TextLink>, an open model. Sign-in by Auth0,
+            data on MongoDB Atlas, hosted on Render.
+          </p>
+        </div>
       </footer>
     </div>
   );
