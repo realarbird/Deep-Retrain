@@ -1,4 +1,4 @@
-import { connection, NextResponse } from "next/server";
+import { after, connection, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { connectDB, DatabaseNotConfiguredError } from "@/lib/db";
 import { getIdentity, type Identity } from "@/lib/identity";
@@ -59,5 +59,25 @@ export async function readJson(request: Request): Promise<unknown> {
     return await request.json();
   } catch {
     throw new HttpError(400, "Request body must be valid JSON.");
+  }
+}
+
+/**
+ * Run work after the response is sent (Auth0 sync, practice generation).
+ * Errors are logged, never thrown. Outside a request (tests, scripts) it just
+ * runs in the background.
+ */
+export function safeAfter(label: string, task: () => Promise<unknown>): void {
+  const run = async () => {
+    try {
+      await task();
+    } catch (err) {
+      console.warn(`[after:${label}]`, (err as Error).message);
+    }
+  };
+  try {
+    after(run);
+  } catch {
+    void run();
   }
 }

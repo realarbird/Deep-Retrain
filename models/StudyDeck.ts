@@ -8,6 +8,9 @@ const studyDeckSchema = new Schema(
     sampleKey: { type: String, default: null },
     cardCount: { type: Number, default: 0 },
     engine: { type: String, enum: ["ollama", "google-ai-studio", "heuristic", "curated"], default: "curated" },
+    /** Local calendar date of the exam (YYYY-MM-DD), or null. */
+    examDate: { type: String, default: null, match: /^\d{4}-\d{2}-\d{2}$/ },
+    examLabel: { type: String, default: "", trim: true, maxlength: 60 },
   },
   { timestamps: true },
 );

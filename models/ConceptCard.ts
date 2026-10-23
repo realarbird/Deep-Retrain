@@ -34,6 +34,12 @@ const conceptCardSchema = new Schema(
     lastScore: { type: Number, default: null },
     lastReviewedAt: { type: Date, default: null },
     source: { type: String, enum: ["ingest", "sample"], default: "ingest" },
+    /** Suspended cards stay in the deck but never come due. Filter with `{ $ne: true }`: older cards have no field. */
+    suspended: { type: Boolean, default: false },
+    /** When Flip or Listen showed the answer. A card revealed since its last review can only be rated. */
+    revealedAt: { type: Date, default: null },
+    /** Practice items (multiple choice, cloze, true/false, harder questions). Checked with zod when read. */
+    practice: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true },
 );

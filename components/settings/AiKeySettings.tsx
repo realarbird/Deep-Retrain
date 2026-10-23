@@ -31,7 +31,7 @@ export function AiKeySettings({ onChange }: { onChange: () => Promise<void> }) {
       const s = await api<AiKeyStatus>("/api/ai-key", { method: "PUT", json: { apiKey: draft } });
       setStatus(s);
       setDraft("");
-      setNotice(s.verified ? "Key saved. Google accepted it." : "Key saved. Google couldn't be reached to check it, so it will be tested on your next review.");
+      setNotice(s.verified ? "Saved. Google accepted it." : "Saved. Google couldn't be reached to check it, so it will be tried on your next answer.");
       await onChange();
     } catch (err) {
       setError((err as Error).message);
@@ -41,7 +41,7 @@ export function AiKeySettings({ onChange }: { onChange: () => Promise<void> }) {
   }
 
   async function remove() {
-    if (!window.confirm("Remove your AI key? Grading will fall back to the offline grader.")) return;
+    if (!window.confirm("Remove your AI key? Written answers will be marked by the offline grader until you add one again.")) return;
     setBusy("remove");
     setError(null);
     setNotice(null);
@@ -57,94 +57,86 @@ export function AiKeySettings({ onChange }: { onChange: () => Promise<void> }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-      <Card className="p-5 sm:p-6">
-        <SectionTitle
-          title="AI key"
-          subtitle={
-            <>
-              Reviews and note extraction run on {status ? <span className="font-mono text-[13px]">{status.model}</span> : "Gemma 4"},
-              Google&apos;s open Gemma 4 model (Apache 2.0). It&apos;s fast and free to use with your own API key.
-            </>
-          }
-        />
+    <Card className="p-5 sm:p-6">
+      <SectionTitle
+        title="AI key"
+        subtitle={
+          <>
+            Written answers and new cards are handled by {status ? <span className="font-mono text-[13px]">{status.model}</span> : "Gemma 4"}, Google&apos;s
+            open model (Apache 2.0). It&apos;s free with your own key.
+          </>
+        }
+      />
 
-        <ol className="list-decimal space-y-1.5 pl-5 text-sm text-ink-2 marker:text-ink-3">
-          <li>
-            Go to <TextLink href={GOOGLE_KEY_URL}>aistudio.google.com/api-keys</TextLink> and sign in with a Google account.
-          </li>
-          <li>
-            Choose <span className="font-medium text-ink">Create API key</span>. The free tier doesn&apos;t need billing.
-          </li>
-          <li>Copy the key and paste it below.</li>
-        </ol>
+      <ol className="list-decimal space-y-1.5 pl-5 text-sm text-ink-2 marker:text-ink-3">
+        <li>
+          Go to <TextLink href={GOOGLE_KEY_URL}>aistudio.google.com/api-keys</TextLink> and sign in with a Google account.
+        </li>
+        <li>
+          Choose <span className="font-medium text-ink">Create API key</span>. The free tier doesn&apos;t need billing.
+        </li>
+        <li>Copy the key and paste it below.</li>
+      </ol>
 
-        <div className="mt-6 border-t border-line pt-5">
-          {status === null && !error && <p className="text-sm text-ink-3">Checking your account…</p>}
-          {status?.saved && (
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-sunken px-3 py-2.5 text-sm">
-              <span className="text-ink">
-                Key saved <span className="text-ink-2">({status.hint})</span>
-              </span>
-              <Button variant="danger" className="px-2 py-1 text-xs" onClick={remove} loading={busy === "remove"}>
-                Remove
-              </Button>
-            </div>
-          )}
-
-          {status && (
-            <form onSubmit={save} className="space-y-3">
-              <label htmlFor="ai-key" className="block text-sm font-medium text-ink">
-                {status.saved ? "Replace key" : "API key"}
-              </label>
-              <input
-                id="ai-key"
-                type="password"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Paste your Google AI Studio key"
-                autoComplete="off"
-                spellCheck={false}
-                className={`${inputClass} font-mono`}
-              />
-              <p className="flex items-start gap-1.5 text-xs text-ink-2">
-                <Lock className="mt-px size-3.5 shrink-0" aria-hidden />
-                This key will be sent encrypted and stored encrypted in your Auth0 account.
-              </p>
-              <Button type="submit" loading={busy === "save"} disabled={draft.trim().length < 20}>
-                Save key
-              </Button>
-            </form>
-          )}
-
-          <div className="mt-4 space-y-2">
-            {notice && <p className="text-sm text-good-text" role="status">{notice}</p>}
-            {error && <ErrorNote>{error}</ErrorNote>}
+      <div className="mt-6 border-t border-line pt-5">
+        {status === null && !error && <p className="text-sm text-ink-3">Checking your account…</p>}
+        {status?.saved && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[4px] bg-sunken px-3 py-2.5 text-sm">
+            <span className="text-ink">
+              Key saved <span className="text-ink-2">({status.hint})</span>
+            </span>
+            <Button variant="danger" className="px-2 py-1 text-xs" onClick={remove} loading={busy === "remove"}>
+              Remove
+            </Button>
           </div>
-        </div>
-      </Card>
+        )}
 
-      <div className="space-y-6 text-sm leading-relaxed text-ink-2">
-        <section>
-          <h3 className="font-medium text-ink">How your key is handled</h3>
-          <ul className="mt-2 list-disc space-y-1.5 pl-5 marker:text-ink-3">
-            <li>It travels from your browser to DeepRetain over HTTPS.</li>
-            <li>
-              DeepRetain encrypts it with AES-256-GCM before sending it to Auth0, so it is also encrypted on the way to Auth0
-              and while it&apos;s stored there. Auth0 never sees the plain key.
-            </li>
-            <li>It&apos;s decrypted only on the server, to call Google when you add notes or answer a question.</li>
-            <li>It&apos;s never shown again in full and never stored in DeepRetain&apos;s database. You can remove it at any time.</li>
-          </ul>
-        </section>
-        <section>
-          <h3 className="font-medium text-ink">Good to know</h3>
-          <ul className="mt-2 list-disc space-y-1.5 pl-5 marker:text-ink-3">
-            <li>Free keys have daily limits. If you reach one, grading switches to the offline grader until the limit resets.</li>
-            <li>On the free tier, Google may use prompts to improve its products. Keep private information out of your notes.</li>
-          </ul>
-        </section>
+        {status && (
+          <form onSubmit={save} className="space-y-3">
+            <label htmlFor="ai-key" className="block text-sm font-medium text-ink">
+              {status.saved ? "Replace key" : "API key"}
+            </label>
+            <input
+              id="ai-key"
+              type="password"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Paste your Google AI Studio key"
+              autoComplete="off"
+              spellCheck={false}
+              className={`${inputClass} font-mono`}
+            />
+            <p className="flex items-start gap-1.5 text-xs text-ink-2">
+              <Lock className="mt-px size-3.5 shrink-0" aria-hidden />
+              Sent encrypted, and stored encrypted in your Auth0 account. It works on every device you sign in on.
+            </p>
+            <Button type="submit" loading={busy === "save"} disabled={draft.trim().length < 20}>
+              Save key
+            </Button>
+          </form>
+        )}
+
+        <div className="mt-4 space-y-2">
+          {notice && (
+            <p className="text-sm text-good-text" role="status">
+              {notice}
+            </p>
+          )}
+          {error && <ErrorNote>{error}</ErrorNote>}
+        </div>
       </div>
-    </div>
+
+      <details className="mt-5 border-t border-line pt-4 text-sm text-ink-2">
+        <summary className="cursor-pointer hover:text-ink">How your key is handled</summary>
+        <ul className="mt-2 list-disc space-y-1.5 pl-5 marker:text-ink-3">
+          <li>It goes from your browser to DeepRetain over HTTPS.</li>
+          <li>DeepRetain encrypts it with AES-256-GCM before sending it to Auth0, so Auth0 only ever holds the encrypted value.</li>
+          <li>It&apos;s decrypted only on the server, to call Google when you add notes or answer a question.</li>
+          <li>It&apos;s never shown again in full and never stored in DeepRetain&apos;s database. You can remove it at any time.</li>
+          <li>Free keys have daily limits. If you hit one, marking switches to the offline grader until it resets.</li>
+          <li>On the free tier, Google may use prompts to improve its products. Keep private information out of your notes.</li>
+        </ul>
+      </details>
+    </Card>
   );
 }

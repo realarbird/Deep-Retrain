@@ -1,15 +1,27 @@
 import type { Types } from "mongoose";
 import { embedTexts, embeddingText } from "@/lib/ai/embeddings";
+import { applyExamWindow } from "@/lib/examPlan";
 import type { Identity } from "@/lib/identity";
-import { decideOutcome, intervalForBox, tierForBox, type DifficultyTier } from "@/lib/leitner";
+import { decideOutcome, intervalForBox, tierForBox, type DifficultyTier, type StudyMode } from "@/lib/leitner";
 import { localDayBounds } from "@/lib/pacer";
+import { heuristicCloze, toStoredPractice, type StoredPractice } from "@/lib/practice";
 import { SAMPLE_DECKS, type SampleConcept, type SampleDeckKey } from "@/lib/sampleDeckData";
+import { addDays, localParts, type Zone } from "@/lib/timezone";
 import { ConceptCard } from "@/models/ConceptCard";
 import { ReviewLog } from "@/models/ReviewLog";
 import { StudyDeck } from "@/models/StudyDeck";
 
 const DAY_MS = 86_400_000;
 const HISTORY_DAYS = 21;
+/** The biology deck comes with an exam 12 days out, so the planner has something to plan. */
+const DEMO_EXAM = { deck: "bio" as SampleDeckKey, inDays: 12, label: "AP Biology exam" };
+
+/** How the made-up history was answered, so every chart on the Stats tab has something to show. */
+const SIMULATED_MODES: StudyMode[] = ["write", "write", "write", "choice", "choice", "cloze", "cloze", "flip", "flip", "voice", "truefalse", "teach"];
+const SIMULATED_DEVICES = [
+  { kind: "desktop", label: "Chrome on Mac" },
+  { kind: "phone", label: "Safari on iPhone" },
+];
 
 /** Boxes for the 10 sample cards: the first six are due right away so the arena has work. */
 const BOX_PLAN = [1, 1, 2, 1, 3, 2, 2, 3, 4, 5];
@@ -32,11 +44,29 @@ export function questionForTier(concept: SampleConcept, tier: DifficultyTier): s
   return concept.initialQuestion;
 }
 
+/** Hand-written practice items for a sample concept: no AI needed in Demo Mode. */
+export function curatedPractice(concept: SampleConcept): StoredPractice {
+  const card = { _id: concept.conceptTitle, ...concept };
+  const cloze = heuristicCloze(card, concept.clozeTerms);
+  return toStoredPractice(
+    card,
+    {
+      ...(cloze ? { cloze } : {}),
+      trueFalse: { statements: [concept.coreFact, concept.falseStatement], trueIndex: 0 },
+      questions: { application: concept.applicationQuestion, synthesis: concept.synthesisQuestion },
+    },
+    "curated",
+  );
+}
+
 interface SimulatedReview {
   cardIndex: number;
   reviewedAt: Date;
   latencyMs: number;
   score: number;
+  mode: StudyMode;
+  device: { kind: string; label: string };
+  confidence: number;
 }
 
 /**
@@ -62,6 +92,10 @@ function simulateHistory(key: SampleDeckKey, now: Date, tzOffsetMinutes: number)
         reviewedAt: new Date(dayStart + (9 + rand() * 12) * 3_600_000),
         latencyMs: Math.round(latencySeconds * 1000),
         score,
+        mode: SIMULATED_MODES[Math.floor(rand() * SIMULATED_MODES.length)],
+        device: SIMULATED_DEVICES[rand() < 0.35 ? 1 : 0],
+        // Confident answers tend to be right, guesses less so.
+        confidence: score >= 85 ? (rand() < 0.8 ? 3 : 2) : score >= 65 ? (rand() < 0.6 ? 2 : 3) : rand() < 0.6 ? 1 : 2,
       });
     }
   }
@@ -91,6 +125,8 @@ export async function seedSampleDeck(
   const sample = SAMPLE_DECKS[key];
   await removeSampleDecks(identity.userId, key);
 
+  const zone: Zone = { name: null, offsetMinutes: tzOffsetMinutes };
+  const examDate = key === DEMO_EXAM.deck ? addDays(localParts(now, zone).dateKey, DEMO_EXAM.inDays) : null;
   const deck = await StudyDeck.create({
     auth0Id: identity.userId,
     title: sample.title,
@@ -98,6 +134,8 @@ export async function seedSampleDeck(
     sampleKey: key,
     cardCount: sample.concepts.length,
     engine: "curated",
+    examDate,
+    examLabel: examDate ? DEMO_EXAM.label : "",
   });
 
   const { vectors, model } = await embedTexts(sample.concepts.map(embeddingText));
@@ -109,10 +147,11 @@ export async function seedSampleDeck(
       const tier = tierForBox(box);
       const own = history.filter((h) => h.cardIndex === i);
       const last = own.at(-1);
-      const nextReviewDate =
+      const scheduled =
         i < DUE_NOW
           ? new Date(now.getTime() - (DUE_NOW - i) * 60_000)
           : new Date(now.getTime() + Math.max(1, intervalForBox(box) - 1) * DAY_MS);
+      const nextReviewDate = applyExamWindow({ next: scheduled, examDate, now, zone, cardId: `${key}-${i}` }).date;
       return {
         auth0Id: identity.userId,
         deckId: deck._id,
@@ -132,6 +171,7 @@ export async function seedSampleDeck(
         lastScore: last?.score ?? null,
         lastReviewedAt: last?.reviewedAt ?? null,
         source: "sample",
+        practice: curatedPractice(concept),
       };
     }),
   );
@@ -159,6 +199,11 @@ export async function seedSampleDeck(
           engine: "simulated",
           simulated: true,
           reviewedAt: h.reviewedAt,
+          mode: h.mode,
+          device: h.device,
+          confidence: h.confidence,
+          thinkMs: h.mode === "write" || h.mode === "teach" ? Math.round(h.latencyMs * 0.45) : null,
+          capLimit: 15,
         };
       }),
     );

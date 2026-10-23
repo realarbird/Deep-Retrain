@@ -229,3 +229,110 @@ describe("AI provider chain", () => {
     expect(r.concepts[0].conceptTitle).toBe("Mutex");
   });
 });
+
+describe("practice items and explanations", () => {
+  beforeEach(() => {
+    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
+    vi.stubEnv("OLLAMA_MODEL", "gemma4:e4b");
+    vi.stubEnv("GOOGLE_AI_MODEL", "");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  const cards = [
+    { _id: "a", conceptTitle: "ATP Synthase", coreFact: CARD.coreFact, expectedKeyPoints: CARD.expectedKeyPoints },
+    { _id: "b", conceptTitle: "Glycolysis", coreFact: "Glycolysis splits glucose into pyruvate in the cytoplasm.", expectedKeyPoints: ["splits glucose"] },
+  ];
+  const batch = {
+    items: [
+      {
+        id: "c1",
+        choice: { question: "What powers ATP synthase?", correct: "A proton gradient", distractors: ["Sunlight", "Glucose directly", "Oxygen gas"] },
+        cloze: { sentence: "ATP synthase uses the proton ____ to make ATP.", answer: "gradient", alternatives: [] },
+        trueFalse: { trueStatement: "It makes ATP.", falseStatement: "It makes glucose." },
+        application: "A membrane starts leaking protons. What happens to ATP output",
+        synthesis: "How is ATP synthase like a water wheel?",
+      },
+      { id: "c9", choice: { question: "Ignored?", correct: "x", distractors: ["a", "b", "c"] } },
+    ],
+  };
+
+  it("asks Gemma for a batch and keeps only items that match a card", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma4:e4b" }] });
+      expect(String(init?.body)).toContain("CARD c2");
+      return jsonResponse({ message: { content: JSON.stringify(batch) } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { generatePractice } = await loadEngine();
+    const { items, engine } = await generatePractice(cards, {}, { related: ["Krebs Cycle"] });
+    expect(engine).toBe("ollama");
+    expect([...items.keys()]).toEqual(["a"]);
+    const a = items.get("a")!;
+    expect(a.choice?.options).toContain("A proton gradient");
+    expect(a.cloze?.answers).toEqual(["gradient"]);
+    expect(a.questions?.application).toMatch(/\?$/);
+  });
+
+  it("returns nothing when only the offline engine is available", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "down" }, 500)));
+    const { generatePractice } = await loadEngine();
+    const r = await generatePractice(cards, { googleApiKey: "k" });
+    expect(r.engine).toBe("heuristic");
+    expect(r.items.size).toBe(0);
+  });
+
+  it("uses the teach-back rubric and a 90 second limit for Teach it back", async () => {
+    const bodies: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma4:e4b" }] });
+        bodies.push(String(init?.body));
+        return jsonResponse({ message: { content: JSON.stringify(EVAL) } });
+      }),
+    );
+    const { evaluateAndFollowUp } = await loadEngine();
+    const r = await evaluateAndFollowUp(CARD, "a long explanation", 60_000, { mode: "teach" });
+    expect(r.outcome).toBe("promote");
+    expect(r.latencyThresholdMs).toBe(90_000);
+    expect(bodies[0]).toContain("explain a concept to someone who has never heard of it");
+  });
+
+  it("tells the grader a voice answer was transcribed", async () => {
+    const bodies: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma4:e4b" }] });
+        bodies.push(String(init?.body));
+        return jsonResponse({ message: { content: JSON.stringify({ ...EVAL, feedback: "Good — clear." }) } });
+      }),
+    );
+    const { evaluateAndFollowUp } = await loadEngine();
+    const r = await evaluateAndFollowUp(CARD, "spoken words", 14_000, { mode: "voice" });
+    expect(r.outcome).toBe("promote");
+    expect(bodies[0]).toContain("transcribed by speech recognition");
+    expect(r.feedback).toBe("Good, clear.");
+  });
+
+  it("explains a missed card in two sentences, with an offline fallback", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.endsWith("/api/tags")
+          ? jsonResponse({ models: [{ name: "gemma4:e4b" }] })
+          : jsonResponse({ message: { content: JSON.stringify({ analogy: "It is a mill. Water turns it. Third." }) } }),
+      ),
+    );
+    const { explainDifferently } = await loadEngine();
+    expect(await explainDifferently(CARD, "Q?", "no idea")).toEqual({ analogy: "It is a mill. Water turns it.", engine: "ollama" });
+
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({}, 500)));
+    const offline = await (await loadEngine()).explainDifferently(CARD, "Q?", "no idea");
+    expect(offline.engine).toBe("heuristic");
+    expect(offline.analogy.length).toBeGreaterThan(10);
+  });
+});

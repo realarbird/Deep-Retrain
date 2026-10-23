@@ -4,6 +4,8 @@ import type { DifficultyTier } from "@/lib/leitner";
 export const EMBEDDING_DIMENSIONS = 384;
 
 export type Engine = "ollama" | "google-ai-studio" | "heuristic";
+/** What graded a review: one of the AI engines, the stored answer key, the learner's own rating, or simulated demo history. */
+export type LogEngine = Engine | "answer-key" | "self-rated" | "simulated";
 
 export const ENGINE_LABELS: Record<Engine, string> = {
   ollama: "Gemma 4 on Ollama",
@@ -97,4 +99,81 @@ export const FOLLOW_UP_JSON_SCHEMA = {
   type: "object",
   properties: { reply: { type: "string" } },
   required: ["reply"],
+} as const;
+
+const practiceItemSchema = z
+  .object({
+    id: z.coerce.string(),
+    choice: z
+      .object({
+        question: z.string().default(""),
+        correct: z.string().default(""),
+        distractors: z.array(z.string()).default([]),
+      })
+      .partial()
+      .optional(),
+    cloze: z
+      .object({ sentence: z.string().default(""), answer: z.string().default(""), alternatives: z.array(z.string()).default([]) })
+      .partial()
+      .optional(),
+    trueFalse: z.object({ trueStatement: z.string().default(""), falseStatement: z.string().default("") }).partial().optional(),
+    application: z.string().optional(),
+    synthesis: z.string().optional(),
+  })
+  .passthrough();
+
+export const practiceSchema = z.preprocess(
+  (value) => (Array.isArray(value) ? { items: value } : value),
+  z.object({ items: z.array(practiceItemSchema).max(20) }),
+);
+export type PracticeBatch = z.infer<typeof practiceSchema>;
+
+export const PRACTICE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          choice: {
+            type: "object",
+            properties: {
+              question: { type: "string" },
+              correct: { type: "string" },
+              distractors: { type: "array", items: { type: "string" } },
+            },
+            required: ["question", "correct", "distractors"],
+          },
+          cloze: {
+            type: "object",
+            properties: {
+              sentence: { type: "string" },
+              answer: { type: "string" },
+              alternatives: { type: "array", items: { type: "string" } },
+            },
+            required: ["sentence", "answer", "alternatives"],
+          },
+          trueFalse: {
+            type: "object",
+            properties: { trueStatement: { type: "string" }, falseStatement: { type: "string" } },
+            required: ["trueStatement", "falseStatement"],
+          },
+          application: { type: "string" },
+          synthesis: { type: "string" },
+        },
+        required: ["id", "choice", "cloze", "trueFalse", "application", "synthesis"],
+      },
+    },
+  },
+  required: ["items"],
+} as const;
+
+export const explainSchema = z.object({ analogy: z.string().trim().min(1) });
+
+export const EXPLAIN_JSON_SCHEMA = {
+  type: "object",
+  properties: { analogy: { type: "string" } },
+  required: ["analogy"],
 } as const;

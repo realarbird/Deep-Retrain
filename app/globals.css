@@ -1,60 +1,121 @@
 @import "tailwindcss";
 
 /*
- * Design tokens. Warm neutrals, one accent, hairline borders.
- * Light is the default; dark values are their own steps, not an inversion.
- * Chart colors were checked with a colorblind-safety validator against both surfaces.
+ * Design tokens: a study notebook. Warm paper, blue rules, a red margin line,
+ * one ink-blue accent. Light is the default; dark is its own set of steps,
+ * not an inversion. Chart colors come from a palette checked with a
+ * colorblind-safety validator against both chart surfaces (`surface`), so
+ * plots always sit on plain card stock, never on ruled paper.
  */
 @theme {
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-plex-serif), ui-serif, Georgia, serif;
   --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-hand: var(--font-caveat), "Bradley Hand", "Segoe Print", cursive;
 
-  --color-page: #f9f9f7;
+  --color-page: #f4f2ec;
   --color-surface: #fcfcfb;
-  --color-sunken: #f3f2ef;
-  --color-ink: #0b0b0b;
-  --color-ink-2: #52514e;
-  --color-ink-3: #75736d;
-  --color-line: #e1e0d9;
-  --color-line-strong: #c3c2b7;
-  --color-on-ink: #fcfcfb;
+  --color-paper: #fffdf7;
+  --color-sunken: #ebe8df;
+  --color-ink: #1a1916;
+  --color-ink-2: #4f4c45;
+  --color-ink-3: #736f66;
+  --color-line: #e2ded3;
+  --color-line-strong: #c8c3b5;
+  --color-on-ink: #fffdf7;
+
+  /* Notebook furniture: decoration only, never data. */
+  --color-rule: #d5e2f2;
+  --color-margin: #eeb4ae;
+  --color-pen: #b8342b;
 
   --color-accent: #2a78d6;
   --color-accent-text: #1c5cab;
   --color-accent-soft: #86b6ef;
   --color-cram: #eb6834;
+  --color-aqua: #1baf7a;
+
+  /* Ordinal blue ramp for heatmaps and maturity, light end first (validated with --ordinal). */
+  --color-seq-1: #86b6ef;
+  --color-seq-2: #5598e7;
+  --color-seq-3: #2a78d6;
+  --color-seq-4: #184f95;
 
   --color-good: #0ca30c;
   --color-good-text: #006300;
   --color-warning: #fab219;
   --color-critical: #d03b3b;
   --color-critical-text: #b42a2a;
+
+  --shadow-paper: 0 1px 0 rgb(26 25 22 / 0.04), 0 10px 24px -18px rgb(26 25 22 / 0.35);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-page: #0d0d0d;
+  :root:where(:not([data-theme="light"])) {
+    --color-page: #121211;
     --color-surface: #1a1a19;
-    --color-sunken: #141413;
-    --color-ink: #f0efec;
-    --color-ink-2: #c3c2b7;
-    --color-ink-3: #9a988f;
-    --color-line: #2c2c2a;
-    --color-line-strong: #45443f;
-    --color-on-ink: #0b0b0b;
-
+    --color-paper: #1f1e1c;
+    --color-sunken: #171716;
+    --color-ink: #efece6;
+    --color-ink-2: #c8c3b7;
+    --color-ink-3: #9d988c;
+    --color-line: #2d2c29;
+    --color-line-strong: #46443f;
+    --color-on-ink: #121211;
+    --color-rule: #252f3a;
+    --color-margin: #4f2d2a;
+    --color-pen: #f08b7f;
     --color-accent: #3987e5;
     --color-accent-text: #86b6ef;
     --color-accent-soft: #6da7ec;
     --color-cram: #d95926;
-
+    --color-aqua: #199e70;
+    --color-seq-1: #184f95;
+    --color-seq-2: #256abf;
+    --color-seq-3: #3987e5;
+    --color-seq-4: #86b6ef;
     --color-good-text: #3fbf3f;
     --color-critical-text: #e66767;
+    --shadow-paper: 0 1px 0 rgb(0 0 0 / 0.3), 0 12px 28px -18px rgb(0 0 0 / 0.8);
   }
+}
+
+:root[data-theme="dark"] {
+  --color-page: #121211;
+  --color-surface: #1a1a19;
+  --color-paper: #1f1e1c;
+  --color-sunken: #171716;
+  --color-ink: #efece6;
+  --color-ink-2: #c8c3b7;
+  --color-ink-3: #9d988c;
+  --color-line: #2d2c29;
+  --color-line-strong: #46443f;
+  --color-on-ink: #121211;
+  --color-rule: #252f3a;
+  --color-margin: #4f2d2a;
+  --color-pen: #f08b7f;
+  --color-accent: #3987e5;
+  --color-accent-text: #86b6ef;
+  --color-accent-soft: #6da7ec;
+  --color-cram: #d95926;
+  --color-aqua: #199e70;
+  --color-seq-1: #184f95;
+  --color-seq-2: #256abf;
+  --color-seq-3: #3987e5;
+  --color-seq-4: #86b6ef;
+  --color-good-text: #3fbf3f;
+  --color-critical-text: #e66767;
+  --shadow-paper: 0 1px 0 rgb(0 0 0 / 0.3), 0 12px 28px -18px rgb(0 0 0 / 0.8);
 }
 
 :root {
   color-scheme: light dark;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
@@ -71,4 +132,113 @@ body {
 }
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+/* An index card: red line under the header, faint blue rules below, text set on the rules. */
+.ruled {
+  --rule-gap: 1.75rem;
+  --head: 3.25rem;
+  background-color: var(--color-paper);
+  background-image:
+    linear-gradient(var(--color-margin), var(--color-margin)),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(var(--rule-gap) - 1px),
+      var(--color-rule) calc(var(--rule-gap) - 1px),
+      var(--color-rule) var(--rule-gap)
+    );
+  background-size:
+    100% 1px,
+    100% calc(100% - var(--head));
+  background-position:
+    0 var(--head),
+    0 calc(var(--head) + 0.5rem);
+  background-repeat: no-repeat;
+}
+
+/* Handwritten red-pen notes. Short, decorative, always paired with plain text for screen readers. */
+.pen {
+  font-family: var(--font-hand);
+  color: var(--color-pen);
+  line-height: 1.1;
+}
+:root[data-handwriting="off"] .pen {
+  font-family: var(--font-sans);
+  font-style: italic;
+}
+
+/* Card flip. Both faces share one grid cell, so the card takes the taller face's height. */
+.flip-scene {
+  perspective: 1400px;
+}
+.flip-card {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 450ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.flip-card > * {
+  grid-area: 1 / 1;
+  backface-visibility: hidden;
+}
+.flip-card > .flip-back {
+  transform: rotateY(180deg);
+}
+.flip-card[data-flipped="true"] {
+  transform: rotateY(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-card {
+    transform: none !important;
+    transition: none;
+  }
+  .flip-card > .flip-back {
+    transform: none;
+  }
+  .flip-card > * {
+    transition: opacity 150ms linear;
+  }
+  .flip-card[data-flipped="true"] > .flip-front,
+  .flip-card:not([data-flipped="true"]) > .flip-back {
+    opacity: 0;
+  }
+}
+:root[data-motion="reduce"] .flip-card {
+  transform: none !important;
+  transition: none;
+}
+:root[data-motion="reduce"] .flip-card > .flip-back {
+  transform: none;
+}
+:root[data-motion="reduce"] .flip-card[data-flipped="true"] > .flip-front,
+:root[data-motion="reduce"] .flip-card:not([data-flipped="true"]) > .flip-back {
+  opacity: 0;
+}
+:root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* A dotted leader between a label and its value, like a table of contents. */
+.leader {
+  flex: 1;
+  min-width: 1.5rem;
+  border-bottom: 1px dotted var(--color-line-strong);
+  transform: translateY(-0.3em);
+}
+
+/* A rubber-stamp outcome on a graded card. */
+.stamp {
+  display: inline-block;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
 }

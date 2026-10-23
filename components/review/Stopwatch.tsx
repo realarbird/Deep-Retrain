@@ -2,10 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { useSettings } from "@/components/SettingsProvider";
 import { cx } from "@/components/ui/primitives";
-import { LATENCY_THRESHOLD_S } from "@/lib/client";
-
-const HIDE_KEY = "deepretain:hide-timer";
 
 /**
  * Measures response latency for one card. Time while the tab is hidden is not
@@ -65,29 +63,13 @@ export function useStopwatch(resetKey: string, running: boolean) {
   return { elapsed, read };
 }
 
-export function Stopwatch({ elapsedMs, frozen }: { elapsedMs: number; frozen?: boolean }) {
-  const [hidden, setHidden] = useState(() => {
-    try {
-      return window.localStorage.getItem(HIDE_KEY) === "1";
-    } catch {
-      return false; // storage unavailable: keep the timer visible
-    }
-  });
-
-  function toggle() {
-    setHidden((h) => {
-      try {
-        window.localStorage.setItem(HIDE_KEY, h ? "0" : "1");
-      } catch {
-        /* ignore */
-      }
-      return !h;
-    });
-  }
-
+export function Stopwatch({ elapsedMs, frozen, thresholdMs }: { elapsedMs: number; frozen?: boolean; thresholdMs: number | null }) {
+  const { settings, update } = useSettings();
+  const hidden = !settings.showTimer;
   const seconds = elapsedMs / 1000;
-  const slow = seconds >= LATENCY_THRESHOLD_S;
-  const progress = Math.min(1, seconds / LATENCY_THRESHOLD_S);
+  const limit = (thresholdMs ?? 0) / 1000;
+  const slow = limit > 0 && seconds >= limit;
+  const progress = limit > 0 ? Math.min(1, seconds / limit) : 0;
   const r = 9;
   const c = 2 * Math.PI * r;
 
@@ -99,30 +81,35 @@ export function Stopwatch({ elapsedMs, frozen }: { elapsedMs: number; frozen?: b
           Timer hidden
         </span>
       ) : (
-        <span className="inline-flex items-center gap-2" title={`Answer time. Under ${LATENCY_THRESHOLD_S}s with a score of 80% or more moves the card up a box.`}>
-          <svg viewBox="0 0 24 24" className="size-5 -rotate-90" aria-hidden>
-            <circle cx="12" cy="12" r={r} fill="none" stroke="var(--color-line)" strokeWidth="3" />
-            <circle
-              cx="12"
-              cy="12"
-              r={r}
-              fill="none"
-              stroke={slow ? "var(--color-warning)" : "var(--color-accent)"}
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray={c}
-              strokeDashoffset={c * (1 - progress)}
-            />
-          </svg>
-          <span className="w-12 font-mono tabular-nums text-ink-2">{seconds.toFixed(1)}s</span>
+        <span
+          className="inline-flex items-center gap-2"
+          title={limit ? `Answer time. Under ${limit}s with a good answer moves the card up a box.` : "This mode sets its own pace."}
+        >
+          {limit > 0 && (
+            <svg viewBox="0 0 24 24" className="size-5 -rotate-90" aria-hidden>
+              <circle cx="12" cy="12" r={r} fill="none" stroke="var(--color-line)" strokeWidth="3" />
+              <circle
+                cx="12"
+                cy="12"
+                r={r}
+                fill="none"
+                stroke={slow ? "var(--color-warning)" : "var(--color-accent)"}
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={c}
+                strokeDashoffset={c * (1 - progress)}
+              />
+            </svg>
+          )}
+          <span className="w-12 tabular-nums text-ink-2">{seconds.toFixed(1)}s</span>
         </span>
       )}
       <button
         type="button"
-        onClick={toggle}
+        onClick={() => update({ showTimer: hidden })}
         className="rounded p-1 text-ink-3 hover:bg-sunken hover:text-ink"
         aria-label={hidden ? "Show timer" : "Hide timer"}
-        title={hidden ? "Show timer" : "Hide timer (latency is still measured)"}
+        title={hidden ? "Show timer" : "Hide timer (time is still measured)"}
       >
         {hidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
       </button>

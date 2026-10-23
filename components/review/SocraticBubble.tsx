@@ -31,8 +31,8 @@ export function SocraticBubble({ reviewLogId, question }: { reviewLogId: string;
 
   return (
     <Card className="p-5 sm:p-6" aria-label="Follow-up question">
-      <p className="text-xs text-ink-3">Follow-up question</p>
-      <p className="mt-1 font-medium leading-snug text-ink">{question}</p>
+      <p className="text-xs text-ink-3">One more question, since you hesitated</p>
+      <p className="mt-1 font-serif text-lg leading-snug text-ink">{question}</p>
 
       {sent ? (
         <blockquote className="mt-4 border-l-2 border-line-strong pl-4 text-sm text-ink-2">{sent}</blockquote>
@@ -57,7 +57,7 @@ export function SocraticBubble({ reviewLogId, question }: { reviewLogId: string;
       )}
 
       {reply && (
-        <div className="mt-4 rounded-md bg-sunken px-4 py-3">
+        <div className="mt-4 rounded-[4px] bg-sunken px-4 py-3">
           <p className="text-xs text-ink-3">{ENGINE_SHORT[reply.engine]}</p>
           <p className="mt-1 text-sm leading-relaxed text-ink">{reply.text}</p>
         </div>

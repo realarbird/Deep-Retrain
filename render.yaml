@@ -1,4 +1,4 @@
-# Render Blueprint — https://render.com/docs/blueprint-spec
+# Render Blueprint: https://render.com/docs/blueprint-spec
 # One-click deploy: New → Blueprint → point at this repo. Render prompts for every `sync: false` value.
 services:
   - type: web
@@ -32,9 +32,10 @@ services:
       - key: OLLAMA_EMBED_MODEL
         value: all-minilm
 
-      # Auth0 (optional — leave blank to run in Demo Mode only). APP_BASE_URL defaults to RENDER_EXTERNAL_URL;
+      # Auth0 (optional; leave blank to run in Demo Mode only). APP_BASE_URL defaults to RENDER_EXTERNAL_URL;
       # don't set it to localhost (it's ignored on Render).
-      # Authorize the app for the Auth0 Management API (read:users, update:users_app_metadata) so learners can save AI keys.
+      # Authorize the app for the Auth0 Management API (read:users, update:users_app_metadata) so learners can save
+      # AI keys and have their settings, devices and progress follow them across devices.
       - key: AUTH0_DOMAIN
         sync: false
       - key: AUTH0_CLIENT_ID
@@ -46,7 +47,8 @@ services:
       - key: AUTH0_MANAGEMENT_DOMAIN
         sync: false
 
-      # Study pacing and judge access
+      # Study pacing and judge access. DAILY_COGNITIVE_CAP is the starting daily limit;
+      # each learner can pick 5-25 in Settings.
       - key: DEMO_MODE_ENABLED
         value: "true"
       - key: DAILY_COGNITIVE_CAP
