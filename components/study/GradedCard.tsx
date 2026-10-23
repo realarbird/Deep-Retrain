@@ -58,7 +58,8 @@ export function GradedCard({ response, onNext, nextLabel }: { response: ReviewRe
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      if (e.key !== "Enter" || e.metaKey || e.ctrlKey || target?.closest("textarea, input")) return;
+      // Enter on a focused button or link does that control's job, not "next card".
+      if (e.key !== "Enter" || e.metaKey || e.ctrlKey || target?.closest("textarea, input, select, button, a, summary")) return;
       e.preventDefault();
       onNext();
     };

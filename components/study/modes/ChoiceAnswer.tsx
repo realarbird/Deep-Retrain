@@ -7,7 +7,7 @@ import { cx, Kbd } from "@/components/ui/primitives";
 export function ChoiceAnswer({ options, busy, onSubmit }: { options: string[]; busy: boolean; onSubmit: (choice: string) => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (busy || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (busy || e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement | null)?.closest("textarea, input, select")) return;
       const n = Number(e.key);
       if (n >= 1 && n <= options.length) onSubmit(options[n - 1]);
     };

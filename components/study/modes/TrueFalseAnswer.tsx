@@ -7,7 +7,7 @@ import { Button, Kbd } from "@/components/ui/primitives";
 export function TrueFalseAnswer({ busy, onSubmit }: { busy: boolean; onSubmit: (answer: boolean) => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (busy || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (busy || e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement | null)?.closest("textarea, input, select")) return;
       if (e.key === "t" || e.key === "T") onSubmit(true);
       if (e.key === "f" || e.key === "F") onSubmit(false);
     };

@@ -15,7 +15,7 @@ const RATINGS: { value: SelfRating; label: string; hint: string }[] = [
 export function RatingBar({ busy, onRate }: { busy: boolean; onRate: (r: SelfRating) => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (busy || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (busy || e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement | null)?.closest("textarea, input, select")) return;
       const n = Number(e.key);
       if (n >= 1 && n <= 4) onRate(RATINGS[n - 1].value);
     };
