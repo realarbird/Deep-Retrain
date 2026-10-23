@@ -8,31 +8,41 @@
  * Each result reports which engine produced it.
  */
 import type { z } from "zod";
-import { decideOutcome, LATENCY_THRESHOLD_MS, nextTier, type DifficultyTier, type ReviewOutcome } from "@/lib/leitner";
+import { decideOutcome, MODE_RULES, nextTier, type DifficultyTier, type ReviewOutcome } from "@/lib/leitner";
 import { GoogleKeyError, googleGenerateJson, type ThinkingLevel } from "@/lib/ai/googleAiStudio";
 import { heuristicEvaluate, heuristicExtract, heuristicFollowUpReply, heuristicQuestion } from "@/lib/ai/heuristic";
 import { parseModelJson } from "@/lib/ai/json";
 import { markOllamaDown, ollamaChatJson, ollamaChatModel, ollamaHasModel } from "@/lib/ai/ollama";
+import { plainProse } from "@/lib/ai/prose";
 import {
+  EXPLAIN_SYSTEM,
   EXTRACT_SYSTEM,
   FOLLOW_UP_SYSTEM,
+  PRACTICE_SYSTEM,
   evaluateSystemPrompt,
   evaluateUserPrompt,
+  explainUserPrompt,
   extractUserPrompt,
   followUpUserPrompt,
+  practiceUserPrompt,
 } from "@/lib/ai/prompts";
 import {
   evaluationJsonSchema,
+  EXPLAIN_JSON_SCHEMA,
   EXTRACTION_JSON_SCHEMA,
   FOLLOW_UP_JSON_SCHEMA,
+  PRACTICE_JSON_SCHEMA,
   evaluationSchema,
+  explainSchema,
   extractionSchema,
   followUpReplySchema,
+  practiceSchema,
   type Engine,
   type EvaluationCardInput,
   type ExtractedConcept,
   type RelatedConcept,
 } from "@/lib/ai/types";
+import { normalizePracticeItem, type PracticeCard, type PracticeParts } from "@/lib/practice";
 
 const MAX_CONCEPTS = 12;
 /** A hosted call that hasn't answered by now is failing; hand over to the next engine. */
@@ -171,6 +181,9 @@ export interface ReviewCardInput extends EvaluationCardInput {
   leitnerBox: number;
 }
 
+/** The study modes Gemma grades. */
+export type ModelGradedMode = "write" | "voice" | "teach";
+
 export interface EvaluationResult {
   score: number;
   feedback: string;
@@ -183,12 +196,14 @@ export interface EvaluationResult {
   difficultyTier: DifficultyTier;
   isFast: boolean;
   isAccurate: boolean;
-  /** Socratic follow-up — only on hesitation (slow + accurate). */
+  /** Socratic follow-up, only on hesitation (slow + accurate). */
   followUpQuestion: string | null;
-  /** Two-sentence analogy — only on reset (inaccurate). */
+  /** Two-sentence analogy, only on reset (inaccurate). */
   analogy: string | null;
-  /** Harder question for the next review — only on promotion. */
+  /** Harder question for the next review, only on promotion. */
   nextQuestion: string | null;
+  boxCapped: boolean;
+  latencyThresholdMs: number | null;
   engine: Engine;
 }
 
@@ -200,15 +215,24 @@ export async function evaluateAndFollowUp(
   card: ReviewCardInput,
   userAnswer: string,
   latencyMs: number,
-  { related = [], now = new Date(), ...ai }: AiOptions & { related?: RelatedConcept[]; now?: Date } = {},
+  {
+    related = [],
+    now = new Date(),
+    mode = "write",
+    ...ai
+  }: AiOptions & { related?: RelatedConcept[]; now?: Date; mode?: ModelGradedMode } = {},
 ): Promise<EvaluationResult> {
   const targetTier = nextTier(card.leitnerBox);
-  const wasFast = latencyMs < LATENCY_THRESHOLD_MS;
+  const threshold = MODE_RULES[mode].latencyMs;
+  const wasFast = threshold === null || latencyMs < threshold;
   const { data, engine } = await runJsonTask(
     {
       name: "evaluate",
-      system: evaluateSystemPrompt(targetTier, related, wasFast),
-      user: evaluateUserPrompt(card, userAnswer, latencyMs),
+      system: evaluateSystemPrompt(targetTier, related, wasFast, {
+        style: mode === "teach" ? "teach" : "recall",
+        latencyThresholdMs: threshold,
+      }),
+      user: evaluateUserPrompt(card, userAnswer, latencyMs, { spoken: mode === "voice" }),
       jsonSchema: evaluationJsonSchema(wasFast),
       schema: evaluationSchema,
       timeoutMs: 90_000,
@@ -220,21 +244,23 @@ export async function evaluateAndFollowUp(
   );
 
   const score = Math.round(Math.min(100, Math.max(0, Number.isFinite(data.score) ? data.score : 0)));
-  const decision = decideOutcome({ score, latencyMs, box: card.leitnerBox, now });
+  const decision = decideOutcome({ score, latencyMs, box: card.leitnerBox, now, mode });
   const fallback = heuristicEvaluate(card, userAnswer, related, targetTier);
 
   return {
     score,
-    feedback: data.feedback,
+    feedback: plainProse(data.feedback),
     coveredKeyPoints: cleanKeyPoints(data.coveredKeyPoints),
     missingKeyPoints: cleanKeyPoints(data.missingKeyPoints),
     ...decision,
     followUpQuestion:
-      decision.outcome === "hesitation" ? ensureQuestionMark(data.socraticFollowUp || fallback.socraticFollowUp) : null,
-    analogy: decision.outcome === "reset" ? firstSentences(data.analogy || fallback.analogy, 2) : null,
+      decision.outcome === "hesitation"
+        ? ensureQuestionMark(plainProse(data.socraticFollowUp || fallback.socraticFollowUp))
+        : null,
+    analogy: decision.outcome === "reset" ? firstSentences(plainProse(data.analogy || fallback.analogy), 2) : null,
     nextQuestion:
-      decision.outcome === "promote"
-        ? ensureQuestionMark(data.nextQuestion || heuristicQuestion(card.conceptTitle, targetTier, related))
+      decision.outcome === "promote" && !decision.boxCapped
+        ? ensureQuestionMark(plainProse(data.nextQuestion || heuristicQuestion(card.conceptTitle, targetTier, related)))
         : null,
     engine,
   };
@@ -261,7 +287,71 @@ export async function replyToFollowUp(
     () => heuristicFollowUpReply(card, answer),
     ai,
   );
-  return { reply: firstSentences(data.reply, 2), engine };
+  return { reply: firstSentences(plainProse(data.reply), 2), engine };
+}
+
+/** Practice items per card, written by Gemma. Empty when only the offline engine is available. */
+export async function generatePractice(
+  cards: PracticeCard[],
+  ai: AiOptions = {},
+  { related = [] }: { related?: string[] } = {},
+): Promise<{ items: Map<string, PracticeParts>; engine: Engine }> {
+  const items = new Map<string, PracticeParts>();
+  if (!cards.length) return { items, engine: "heuristic" };
+
+  const ids = cards.map((_, i) => `c${i + 1}`);
+  const { data, engine } = await runJsonTask(
+    {
+      name: "practice",
+      system: PRACTICE_SYSTEM,
+      user: practiceUserPrompt(
+        cards.map((c, i) => ({ id: ids[i], conceptTitle: c.conceptTitle, coreFact: c.coreFact, expectedKeyPoints: c.expectedKeyPoints })),
+        related,
+      ),
+      jsonSchema: PRACTICE_JSON_SCHEMA,
+      schema: practiceSchema,
+      timeoutMs: 150_000,
+      maxTokens: Math.min(8_000, 650 * cards.length),
+      hostedThinking: "minimal",
+    },
+    () => ({ items: [] }),
+    ai,
+  );
+  if (engine === "heuristic") return { items, engine };
+
+  for (const raw of data.items) {
+    const index = ids.indexOf(String(raw.id).trim());
+    if (index < 0) continue;
+    const parts = normalizePracticeItem(raw, cards[index]);
+    if (Object.keys(parts).length) items.set(String(cards[index]._id), parts);
+  }
+  return { items, engine };
+}
+
+/** Two sentences that explain a missed card another way. Only runs when the learner asks for it. */
+export async function explainDifferently(
+  card: Pick<EvaluationCardInput, "conceptTitle" | "coreFact" | "expectedKeyPoints">,
+  question: string,
+  answer: string,
+  ai: AiOptions = {},
+): Promise<{ analogy: string; engine: Engine }> {
+  const { data, engine } = await runJsonTask(
+    {
+      name: "explain",
+      system: EXPLAIN_SYSTEM,
+      user: explainUserPrompt(card, question, answer),
+      jsonSchema: EXPLAIN_JSON_SCHEMA,
+      schema: explainSchema,
+      timeoutMs: 60_000,
+      maxTokens: 250,
+      hostedThinking: "minimal",
+    },
+    () => ({
+      analogy: heuristicEvaluate({ ...card, currentQuestion: question, difficultyTier: "recall" }, answer, []).analogy,
+    }),
+    ai,
+  );
+  return { analogy: firstSentences(plainProse(data.analogy), 2), engine };
 }
 
 /** Which engine would handle the next request (for the UI badge). */

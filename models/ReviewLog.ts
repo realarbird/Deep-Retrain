@@ -20,15 +20,47 @@ const reviewLogSchema = new Schema(
     followUpReply: { type: String, default: null },
     analogy: { type: String, default: null },
     retrievedConceptIds: [{ type: Schema.Types.ObjectId, ref: "ConceptCard" }],
-    engine: { type: String, enum: ["ollama", "google-ai-studio", "heuristic", "simulated"], required: true },
+    engine: {
+      type: String,
+      enum: ["ollama", "google-ai-studio", "heuristic", "simulated", "answer-key", "self-rated"],
+      required: true,
+    },
     simulated: { type: Boolean, default: false },
     reviewedAt: { type: Date, required: true, default: () => new Date() },
+    /** How the card was answered. Older logs have no field and count as "write". */
+    mode: {
+      type: String,
+      enum: ["write", "voice", "teach", "flip", "listen", "choice", "truefalse", "cloze"],
+      default: "write",
+    },
+    selfRating: { type: String, enum: ["again", "hard", "good", "easy", null], default: null },
+    /** 1 = guessing, 2 = unsure, 3 = sure. Only asked when the learner turns it on. */
+    confidence: { type: Number, min: 1, max: 3, default: null },
+    /** Time to the first keystroke, for typed answers. */
+    thinkMs: { type: Number, default: null },
+    sessionId: { type: String, default: null },
+    /** Client-generated id so a retried submit replays instead of moving the card twice. */
+    attemptId: { type: String, default: undefined },
+    device: {
+      type: new Schema({ kind: String, label: String }, { _id: false }),
+      default: null,
+    },
+    /** The daily cap in force when this review was logged. */
+    capLimit: { type: Number, default: null },
+    boxCapped: { type: Boolean, default: false },
+    examAdjusted: { type: Boolean, default: false },
+    /** The response sent for this review, replayed if the same attempt is submitted again. */
+    replay: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true },
 );
 
 reviewLogSchema.index({ auth0Id: 1, reviewedAt: -1 });
 reviewLogSchema.index({ cardId: 1, reviewedAt: -1 });
+reviewLogSchema.index(
+  { auth0Id: 1, attemptId: 1 },
+  { unique: true, partialFilterExpression: { attemptId: { $type: "string" } } },
+);
 
 export type ReviewLogDoc = InferSchemaType<typeof reviewLogSchema> & { _id: mongoose.Types.ObjectId };
 

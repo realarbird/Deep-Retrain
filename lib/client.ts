@@ -43,7 +43,7 @@ export interface DashboardData {
   cap: CapStatus;
   dueCards: ReviewCard[];
   nextDue: { at: string; conceptTitle: string } | null;
-  latencyTrend: { date: string; avgSeconds: number | null; movingAvgSeconds: number | null; reviews: number }[];
+  latencyTrend?: { date: string; avgSeconds: number | null; movingAvgSeconds: number | null; reviews: number }[];
   hasSimulatedHistory: boolean;
   decks: { id: string; title: string; sourceType: "notes" | "sample"; cardCount: number }[];
   recentReviews: {

@@ -51,7 +51,7 @@ export function Dashboard({ data, actions, isDemo }: { data: DashboardData; acti
 
       <div className="grid gap-6 lg:grid-cols-2">
         <LeitnerBoxes boxes={data.boxes} />
-        <LatencyTrendChart trend={data.latencyTrend} simulated={data.hasSimulatedHistory} />
+        <LatencyTrendChart trend={data.latencyTrend ?? []} simulated={data.hasSimulatedHistory} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

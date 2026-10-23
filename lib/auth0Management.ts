@@ -16,9 +16,21 @@ export class ManagementApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    /** On a 429, how long Auth0 asked us to wait. */
+    public retryAfterMs: number | null = null,
   ) {
     super(message);
   }
+}
+
+/** Auth0 sends `retry-after` (seconds) or `x-ratelimit-reset` (epoch seconds) with a 429. */
+function retryAfter(res: Response): number | null {
+  if (res.status !== 429) return null;
+  const seconds = Number(res.headers.get("retry-after"));
+  if (Number.isFinite(seconds) && seconds > 0) return seconds * 1000;
+  const reset = Number(res.headers.get("x-ratelimit-reset"));
+  if (Number.isFinite(reset) && reset > 0) return Math.max(1000, reset * 1000 - Date.now());
+  return 10_000;
 }
 
 function config() {
@@ -49,7 +61,7 @@ async function managementToken(): Promise<string> {
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new ManagementApiError(`Auth0 Management API token request failed: HTTP ${res.status} ${detail.slice(0, 200)}`, res.status);
+    throw new ManagementApiError(`Auth0 Management API token request failed: HTTP ${res.status} ${detail.slice(0, 200)}`, res.status, retryAfter(res));
   }
   const json = (await res.json()) as { access_token: string; expires_in: number };
   cachedToken = { value: json.access_token, expiresAt: Date.now() + json.expires_in * 1000 };
@@ -67,7 +79,11 @@ async function managementFetch(path: string, init: RequestInit = {}): Promise<Re
   if (!res.ok) {
     if (res.status === 401) cachedToken = null;
     const detail = await res.text().catch(() => "");
-    throw new ManagementApiError(`Auth0 Management API ${init.method ?? "GET"} ${path.split("?")[0]} failed: HTTP ${res.status} ${detail.slice(0, 200)}`, res.status);
+    throw new ManagementApiError(
+      `Auth0 Management API ${init.method ?? "GET"} ${path.split("?")[0]} failed: HTTP ${res.status} ${detail.slice(0, 200)}`,
+      res.status,
+      retryAfter(res),
+    );
   }
   return res;
 }

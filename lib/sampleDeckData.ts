@@ -9,6 +9,10 @@ export interface SampleConcept {
   initialQuestion: string;
   applicationQuestion: string;
   synthesisQuestion: string;
+  /** Terms from the core fact worth blanking out in Fill the gap, best first. */
+  clozeTerms: string[];
+  /** A clearly wrong statement about the concept, for True or false. */
+  falseStatement: string;
 }
 
 export interface SampleDeck {
@@ -35,6 +39,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "A poison stops oxygen from reaching a cell's mitochondria. Which stage of respiration halts first, and what happens to ATP output?",
         synthesisQuestion:
           "How is cellular respiration the chemical reverse of photosynthesis, and why does that make the two processes interdependent in an ecosystem?",
+        clozeTerms: ["ATP", "glucose"],
+        falseStatement: "Cellular respiration builds glucose from carbon dioxide and water, storing light energy in sugar.",
       },
       {
         conceptTitle: "Glycolysis",
@@ -51,6 +57,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "Sprinting muscle cells run short of oxygen yet still make some ATP. Which pathway keeps running, and why must the cells regenerate NAD+?",
         synthesisQuestion:
           "Why is glycolysis considered evolutionarily ancient, and how does that connect to it needing neither oxygen nor organelles?",
+        clozeTerms: ["pyruvate", "cytoplasm"],
+        falseStatement: "Glycolysis takes place in the mitochondrial matrix and stops whenever oxygen runs out.",
       },
       {
         conceptTitle: "Electron Transport Chain",
@@ -67,6 +75,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "A drug makes the inner mitochondrial membrane leaky to protons. What happens to ATP production, and where does the energy go instead?",
         synthesisQuestion:
           "Compare chemiosmosis in mitochondria with chemiosmosis in chloroplasts: what is the same, and what supplies the energy in each?",
+        clozeTerms: ["ATP synthase", "protons"],
+        falseStatement: "The electron transport chain sits in the cytoplasm and makes ATP without any proton gradient.",
       },
       {
         conceptTitle: "Light Reactions",
@@ -83,6 +93,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "An herbicide blocks photosystem II in a plant kept in bright light. Will the plant still release oxygen? Explain.",
         synthesisQuestion:
           "How do the light reactions and the Calvin cycle depend on each other, and what happens to the Calvin cycle in prolonged darkness?",
+        clozeTerms: ["thylakoid", "oxygen"],
+        falseStatement: "The light reactions happen in the stroma and give off carbon dioxide.",
       },
       {
         conceptTitle: "Calvin Cycle",
@@ -99,6 +111,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "On a hot, dry day a plant closes its stomata. How does that affect the Calvin cycle, and why?",
         synthesisQuestion:
           "Why are C4 and CAM plants better adapted to hot climates, and which Calvin cycle weakness do they work around?",
+        clozeTerms: ["rubisco", "stroma"],
+        falseStatement: "The Calvin cycle runs in the thylakoid membranes and splits water to release oxygen.",
       },
       {
         conceptTitle: "Enzyme Kinetics",
@@ -115,6 +129,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "A patient's fever reaches 42°C. Why might some of their enzymes stop working, and is the damage always reversible?",
         synthesisQuestion:
           "Compare competitive and noncompetitive inhibition: how does adding more substrate affect each, and why?",
+        clozeTerms: ["activation energy", "active site"],
+        falseStatement: "Enzymes speed up reactions by raising activation energy, and their rate keeps climbing with more substrate forever.",
       },
       {
         conceptTitle: "Mitosis vs Meiosis",
@@ -131,6 +147,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "A human cell with 46 chromosomes goes through meiosis. How many chromosomes does each resulting cell have, and why does that matter at fertilization?",
         synthesisQuestion:
           "How does nondisjunction in meiosis lead to conditions like Down syndrome, and why can't the same error in a skin cell's mitosis be inherited?",
+        clozeTerms: ["haploid", "crossing over"],
+        falseStatement: "Mitosis makes four genetically unique haploid gametes, while meiosis makes two identical diploid cells.",
       },
       {
         conceptTitle: "DNA Replication",
@@ -147,6 +165,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "If DNA ligase stopped working, which strand would be affected most, and what would the new DNA look like?",
         synthesisQuestion:
           "How does DNA polymerase's 5'-to-3' rule explain both Okazaki fragments and the gradual shortening of telomeres?",
+        clozeTerms: ["helicase", "Okazaki fragments"],
+        falseStatement: "DNA replication is conservative: each new helix is built from two brand-new strands, and the lagging strand is made in one piece.",
       },
       {
         conceptTitle: "Gene Expression",
@@ -163,6 +183,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "A point mutation changes one DNA base in a gene. Describe two different effects it could have on the resulting protein.",
         synthesisQuestion:
           "How can eukaryotic cells make several proteins from one gene, and which step of gene expression makes that possible?",
+        clozeTerms: ["mRNA", "ribosome"],
+        falseStatement: "Translation copies DNA into mRNA in the nucleus, and transcription builds the protein at the ribosome.",
       },
       {
         conceptTitle: "Natural Selection",
@@ -179,6 +201,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "Antibiotics are overused on a farm. Explain step by step how resistant bacteria come to dominate.",
         synthesisQuestion:
           "How does Hardy-Weinberg equilibrium act as a null model for detecting natural selection in a population?",
+        clozeTerms: ["heritable", "generations"],
+        falseStatement: "Natural selection changes individual organisms during their lifetimes, and they pass those acquired traits on.",
       },
     ],
   },
@@ -200,6 +224,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "A function loops over an array and, for each element, binary-searches another sorted array of the same size. What is its Big-O, and why?",
         synthesisQuestion:
           "Why can an O(n log n) algorithm beat an O(n) one on real inputs, and what does that reveal about the limits of Big-O?",
+        clozeTerms: ["upper bound", "constants"],
+        falseStatement: "Big-O notation gives an algorithm's exact running time in seconds on a particular machine.",
       },
       {
         conceptTitle: "Hash Tables",
@@ -216,6 +242,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "Your hash table's lookups suddenly degrade toward O(n). What two causes would you investigate first?",
         synthesisQuestion:
           "Compare a hash table with a balanced binary search tree: when would you pick the tree despite slower average lookups?",
+        clozeTerms: ["hash function", "load factor"],
+        falseStatement: "Hash tables keep their keys in sorted order, so every lookup takes O(log n) time.",
       },
       {
         conceptTitle: "Binary Search",
@@ -232,6 +260,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "At most how many comparisons does binary search need on a sorted array of one million items? Show your reasoning.",
         synthesisQuestion:
           "How is binary search on an array related to searching a balanced binary search tree, and why do both run in O(log n)?",
+        clozeTerms: ["sorted", "middle element"],
+        falseStatement: "Binary search works on unsorted arrays by checking every element one at a time.",
       },
       {
         conceptTitle: "Recursion & Call Stack",
@@ -248,6 +278,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "A recursive factorial(100000) crashes with a stack overflow. Why, and how would you rewrite it to avoid the crash?",
         synthesisQuestion:
           "How does recursion power divide-and-conquer algorithms like merge sort, and where does the real work happen in each call?",
+        clozeTerms: ["base case", "frame"],
+        falseStatement: "A recursive function never needs a base case, because the call stack stops it on its own.",
       },
       {
         conceptTitle: "TCP vs UDP",
@@ -264,6 +296,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "You're sending player positions in a live multiplayer game. Would you choose TCP or UDP, and how would you handle lost packets?",
         synthesisQuestion:
           "Why does HTTP/3 run over QUIC on top of UDP instead of TCP, and which TCP problem does that avoid?",
+        clozeTerms: ["connectionless", "retransmission"],
+        falseStatement: "UDP sets up a connection and guarantees ordered delivery, while TCP sends packets with no guarantees.",
       },
       {
         conceptTitle: "CAP Theorem",
@@ -280,6 +314,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "A bank ledger and a social-media like counter are both distributed. Which side of CAP should each favor during a partition, and why?",
         synthesisQuestion:
           "How does eventual consistency let AP systems recover after a partition, and what kinds of conflicts must they resolve?",
+        clozeTerms: ["partition", "availability"],
+        falseStatement: "The CAP theorem says a distributed system can keep consistency and availability through any network partition.",
       },
       {
         conceptTitle: "Deadlock",
@@ -296,6 +332,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "One thread locks account A then B while another locks B then A during transfers. How would you change the code to prevent deadlock?",
         synthesisQuestion:
           "How do deadlock, livelock, and starvation differ, and can a system suffer one without the others?",
+        clozeTerms: ["circular wait", "preemption"],
+        falseStatement: "A deadlock is one process running so long that it hogs the CPU; no cycle of waiting is involved.",
       },
       {
         conceptTitle: "Dijkstra's Algorithm",
@@ -312,6 +350,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "Your routing graph gains one negative-weight edge (a toll refund). Why might Dijkstra now give a wrong answer, and what would you use instead?",
         synthesisQuestion:
           "In what sense is Dijkstra's algorithm greedy, and how does it relate to breadth-first search on an unweighted graph?",
+        clozeTerms: ["priority queue", "non-negative"],
+        falseStatement: "Dijkstra's algorithm handles negative edge weights correctly by always settling the farthest node first.",
       },
       {
         conceptTitle: "Dynamic Programming",
@@ -328,6 +368,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "Naive recursive Fibonacci(50) takes forever. Explain why, and how dynamic programming brings it down to O(n).",
         synthesisQuestion:
           "How do you decide whether a problem calls for dynamic programming, a greedy algorithm, or divide and conquer?",
+        clozeTerms: ["memoization", "tabulation"],
+        falseStatement: "Dynamic programming only helps when a problem's subproblems never repeat.",
       },
       {
         conceptTitle: "Garbage Collection",
@@ -344,6 +386,8 @@ export const SAMPLE_DECKS: Record<SampleDeckKey, SampleDeck> = {
           "A long-running server's memory keeps growing even though the language has a garbage collector. What kind of bug would you suspect?",
         synthesisQuestion:
           "Compare tracing garbage collection with reference counting: which one handles cycles, and what does each cost at runtime?",
+        clozeTerms: ["roots", "mark-and-sweep"],
+        falseStatement: "Garbage collectors free an object as soon as one variable stops pointing to it, even if others still do.",
       },
     ],
   },

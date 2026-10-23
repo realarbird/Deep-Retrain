@@ -29,7 +29,7 @@ function l2normalize(v: number[]): number[] {
 
 /**
  * Deterministic 384-dim feature-hashing embedding (unigrams + bigrams).
- * Lexical, not semantic — the offline fallback when no embedding model is up.
+ * Lexical, not semantic: the offline fallback when no embedding model is up.
  */
 export function hashEmbedding(text: string, dims = EMBEDDING_DIMENSIONS): number[] {
   const v = new Array<number>(dims).fill(0);

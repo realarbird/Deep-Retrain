@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { embedTexts, embeddingText } from "@/lib/ai/embeddings";
 import { getGoogleApiKey } from "@/lib/aiKey";
-import { HttpError, readJson, withIdentity } from "@/lib/api";
+import { HttpError, readJson, safeAfter, withIdentity } from "@/lib/api";
 import { extractConceptsFromNotes } from "@/lib/engine";
+import { fillPractice } from "@/lib/practiceJobs";
 import { toReviewCardDTO } from "@/lib/study";
 import { ingestBodySchema } from "@/lib/validation";
 import { ConceptCard } from "@/models/ConceptCard";
 import { StudyDeck } from "@/models/StudyDeck";
+import { UserProfile } from "@/models/UserProfile";
 
 export const maxDuration = 300;
 
@@ -49,6 +51,11 @@ export const POST = withIdentity(async (identity, request: Request) => {
       source: "ingest",
     })),
   );
+
+  // The notes are now cards, so the draft they came from (synced across devices) can go.
+  await UserProfile.updateOne({ auth0Id: identity.userId }, { $set: { draft: null } });
+  // Gemma writes the multiple-choice, cloze and true/false items after the response, so cards appear right away.
+  safeAfter("practice", () => fillPractice(identity, cards.map((c) => String(c._id))));
 
   return NextResponse.json(
     {

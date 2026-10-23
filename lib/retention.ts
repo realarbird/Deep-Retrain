@@ -4,6 +4,8 @@
  * Ebbinghaus-style exponential decay R(t) = e^(-t / S), where S is memory
  * stability in days. Each spaced review restores recall and multiplies S.
  */
+import { clampBox } from "@/lib/leitner";
+import { addDays, localParts, type Zone } from "@/lib/timezone";
 
 export const CRAM_STABILITY_DAYS = 2;
 export const SPACED_INITIAL_STABILITY_DAYS = 1.2;
@@ -42,6 +44,24 @@ export const RETENTION_CHART_DAYS = 42;
 
 export function retentionAt(daysSince: number, stabilityDays: number): number {
   return Math.exp(-daysSince / stabilityDays);
+}
+
+/** Stability of a card in a Leitner box, on the same model as the landing chart: 1.2 days, ×2.5 per passed review. */
+export function stabilityForBox(box: number): number {
+  return SPACED_INITIAL_STABILITY_DAYS * STABILITY_GROWTH ** (clampBox(box) - 1);
+}
+
+export interface RecallCard {
+  leitnerBox: number;
+  lastReviewedAt?: Date | string | null;
+  reviewCount?: number | null;
+}
+
+/** Estimated chance (0–1) of recalling a card at `at`. Null for a card that has never been reviewed. */
+export function recallAt(card: RecallCard, at: Date): number | null {
+  if (!card.reviewCount || !card.lastReviewedAt) return null;
+  const days = Math.max(0, (at.getTime() - new Date(card.lastReviewedAt).getTime()) / 86_400_000);
+  return retentionAt(days, stabilityForBox(card.leitnerBox));
 }
 
 export interface RetentionPoint {
@@ -100,45 +120,67 @@ export function localDateKey(date: Date, tzOffsetMinutes: number): string {
   return new Date(date.getTime() - tzOffsetMinutes * 60_000).toISOString().slice(0, 10);
 }
 
-export function buildLatencyTrend(
-  logs: LatencyLog[],
-  { days = 28, now = new Date(), tzOffsetMinutes = 0 }: { days?: number; now?: Date; tzOffsetMinutes?: number } = {},
-): LatencyTrendPoint[] {
+export interface DailyAveragePoint {
+  date: string;
+  avg: number | null;
+  movingAvg: number | null;
+  count: number;
+}
+
+export interface TrendOptions {
+  days?: number;
+  now?: Date;
+  tzOffsetMinutes?: number;
+  /** Overrides `tzOffsetMinutes` when the learner's IANA zone is known. */
+  zone?: Zone;
+}
+
+/**
+ * Daily averages of one value per local day for the last `days` days, with a
+ * 7-day trailing moving average of the daily averages (each study day counts once).
+ */
+export function dailyAverageTrend<T extends { reviewedAt: Date }>(
+  logs: T[],
+  valueOf: (log: T) => number | null,
+  { days = 28, now = new Date(), tzOffsetMinutes = 0, zone }: TrendOptions = {},
+): DailyAveragePoint[] {
+  const z: Zone = zone ?? { name: null, offsetMinutes: tzOffsetMinutes };
   const buckets = new Map<string, { total: number; count: number }>();
   for (const log of logs) {
-    const key = localDateKey(new Date(log.reviewedAt), tzOffsetMinutes);
+    const value = valueOf(log);
+    if (value === null || !Number.isFinite(value)) continue;
+    const key = localParts(new Date(log.reviewedAt), z).dateKey;
     const b = buckets.get(key) ?? { total: 0, count: 0 };
-    b.total += log.responseLatencyMs;
+    b.total += value;
     b.count += 1;
     buckets.set(key, b);
   }
 
-  const todayKey = localDateKey(now, tzOffsetMinutes);
-  const today = new Date(`${todayKey}T00:00:00.000Z`);
-  const series: LatencyTrendPoint[] = [];
+  const todayKey = localParts(now, z).dateKey;
+  const series: DailyAveragePoint[] = [];
   for (let i = days - 1; i >= 0; i--) {
-    const key = new Date(today.getTime() - i * 86_400_000).toISOString().slice(0, 10);
+    const key = addDays(todayKey, -i);
     const b = buckets.get(key);
-    series.push({
-      date: key,
-      avgSeconds: b ? round1(b.total / b.count / 1000) : null,
-      movingAvgSeconds: null,
-      reviews: b?.count ?? 0,
-    });
+    series.push({ date: key, avg: b ? b.total / b.count : null, movingAvg: null, count: b?.count ?? 0 });
   }
 
-  // 7-day trailing moving average of the daily averages (each study day counts once).
   for (let i = 0; i < series.length; i++) {
     const window = series
       .slice(Math.max(0, i - 6), i + 1)
-      .map((p) => p.avgSeconds)
+      .map((p) => p.avg)
       .filter((v): v is number => v !== null);
-    series[i].movingAvgSeconds = window.length
-      ? round1(window.reduce((a, b) => a + b, 0) / window.length)
-      : null;
+    series[i].movingAvg = window.length ? window.reduce((a, b) => a + b, 0) / window.length : null;
   }
-
   return series;
+}
+
+export function buildLatencyTrend(logs: LatencyLog[], options: TrendOptions = {}): LatencyTrendPoint[] {
+  return dailyAverageTrend(logs, (l) => l.responseLatencyMs / 1000, { days: 28, ...options }).map((p) => ({
+    date: p.date,
+    avgSeconds: p.avg === null ? null : round1(p.avg),
+    movingAvgSeconds: p.movingAvg === null ? null : round1(p.movingAvg),
+    reviews: p.count,
+  }));
 }
 
 function round1(n: number): number {

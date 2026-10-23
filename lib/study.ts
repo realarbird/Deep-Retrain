@@ -5,14 +5,14 @@ import { StudyDeck } from "@/models/StudyDeck";
 import { UserProfile } from "@/models/UserProfile";
 
 /** Real (non-simulated) micro-reviews in the user's local day, against the daily cognitive cap. */
-export async function getCapStatus(userId: string, tzOffsetMinutes: number, now = new Date()): Promise<CapStatus> {
+export async function getCapStatus(userId: string, tzOffsetMinutes: number, now = new Date(), limit = dailyCap()): Promise<CapStatus> {
   const { start, end } = localDayBounds(now, tzOffsetMinutes);
   const used = await ReviewLog.countDocuments({
     auth0Id: userId,
     simulated: { $ne: true },
     reviewedAt: { $gte: start, $lt: end },
   });
-  return capStatus(used, dailyCap(), end);
+  return capStatus(used, limit, end);
 }
 
 /** Card fields safe to send before an answer: no key points or core fact. */

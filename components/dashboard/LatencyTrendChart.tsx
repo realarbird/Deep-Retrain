@@ -9,7 +9,7 @@ function shortDate(iso: string): string {
   return new Date(`${iso}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-export function LatencyTrendChart({ trend, simulated }: { trend: DashboardData["latencyTrend"]; simulated: boolean }) {
+export function LatencyTrendChart({ trend, simulated }: { trend: NonNullable<DashboardData["latencyTrend"]>; simulated: boolean }) {
   const hasData = trend.some((p) => p.avgSeconds !== null);
   const maxY = Math.max(LATENCY_THRESHOLD_S + 4, ...trend.map((p) => p.avgSeconds ?? 0));
 
@@ -45,7 +45,7 @@ export function LatencyTrendChart({ trend, simulated }: { trend: DashboardData["
               <Tooltip
                 cursor={{ stroke: VIZ.axis }}
                 content={({ active, payload }) => {
-                  const p = payload?.[0]?.payload as DashboardData["latencyTrend"][number] | undefined;
+                  const p = payload?.[0]?.payload as NonNullable<DashboardData["latencyTrend"]>[number] | undefined;
                   if (!active || !p) return null;
                   return (
                     <TooltipBox

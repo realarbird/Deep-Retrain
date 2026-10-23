@@ -9,7 +9,7 @@ import type { EvaluationCardInput, ExtractedConcept, FollowUpReply, RawEvaluatio
 const MAX_CONCEPTS = 12;
 const KEY_POINT_COVERED = 0.5;
 
-const STOPWORDS = new Set(
+export const STOPWORDS = new Set(
   (
     "a an and are as at be been being but by can could did do does doing for from had has have having he her his how i if in into is it its " +
     "itself me more most my no nor not of off on once only or other our out over own same she should so some such than that the their them " +
@@ -156,7 +156,7 @@ const NEXT_TIER: Record<DifficultyTier, DifficultyTier> = {
 export function heuristicQuestion(title: string, tier: DifficultyTier, related: RelatedConcept[]): string {
   if (tier === "recall") return `What is ${title}, and what are its essential parts?`;
   if (tier === "application")
-    return `Apply it: describe a real situation where ${title} explains what you observe — what would you predict happens next?`;
+    return `Think of a real situation where ${title} explains what you see. What would you predict happens next?`;
   if (related.length)
     return `How does ${title} connect to ${related[0].conceptTitle}, and what would happen to one if the other failed?`;
   return `Compare ${title} with a related idea you know: what do they share, and where do they differ?`;
@@ -183,7 +183,7 @@ export function heuristicEvaluate(
 
   const feedback =
     score >= ACCURACY_THRESHOLD
-      ? `Solid recall — you covered ${covered.length} of ${scored.length} key points.`
+      ? `Solid recall. You covered ${covered.length} of ${scored.length} key points.`
       : missing.length
         ? `You're on the way, but you missed: ${missing.slice(0, 2).join("; ")}.`
         : "Your answer is in the right area but too thin to show real understanding.";
@@ -194,7 +194,7 @@ export function heuristicEvaluate(
     coveredKeyPoints: covered,
     missingKeyPoints: missing,
     analogy: `Think of ${card.conceptTitle} as a recipe: ${lowerFirst(firstFact)}. If you keep only one ingredient in mind, keep this one: ${lowerFirst(stripEndPunctuation(weakest))}.`,
-    socraticFollowUp: `Socratic check: why is it true that ${lowerFirst(stripEndPunctuation(weakest))} — and what would break if it weren't?`,
+    socraticFollowUp: `Why is it true that ${lowerFirst(stripEndPunctuation(weakest))}, and what would break if it weren't?`,
     nextQuestion: heuristicQuestion(card.conceptTitle, targetTier, related),
   };
 }
@@ -209,7 +209,7 @@ export function heuristicFollowUpReply(
   return {
     reply:
       overlap >= 0.3
-        ? `Good — that ties back to the core of ${card.conceptTitle}: ${card.coreFact}`
+        ? `Good. That ties back to the core of ${card.conceptTitle}: ${card.coreFact}`
         : `Close. Anchor your reasoning to the core of ${card.conceptTitle}: ${card.coreFact}`,
   };
 }
