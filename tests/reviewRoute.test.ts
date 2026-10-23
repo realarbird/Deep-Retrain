@@ -168,6 +168,21 @@ describe("POST /api/review", () => {
     expect(card(cardId(0)).revealedAt).toBeNull();
   });
 
+  it("lets a card be rated after an old reveal, once its answer is shown again", async () => {
+    const { cardId } = seedDeck();
+    await review({ mode: "reveal", cardId: cardId(0) });
+    // Listen lets you move on without rating; the card comes back as Flip much later.
+    card(cardId(0)).revealedAt = new Date(Date.now() - 45 * 60_000);
+    const stale = await review({ mode: "flip", cardId: cardId(0), rating: "good", latencyMs: 3_000 });
+    expect(stale.status).toBe(409);
+    expect(stale.body.needsReveal).toBe(true);
+
+    await review({ mode: "reveal", cardId: cardId(0) });
+    const rated = await review({ mode: "flip", cardId: cardId(0), rating: "good", latencyMs: 3_000 });
+    expect(rated.status).toBe(200);
+    expect(rated.body.result).toMatchObject({ engine: "self-rated", selfRating: "good" });
+  });
+
   it("refuses a stale write when the card was reviewed elsewhere, and logs nothing", async () => {
     const { cardId } = seedDeck();
     const stored = card(cardId(0));

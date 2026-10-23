@@ -365,7 +365,9 @@ async function handleReveal(identity: Identity, cardId: string, tz: number): Pro
     .lean();
   if (!card) throw new HttpError(404, "That card no longer exists.");
   if (card.suspended) throw new HttpError(409, "That card is suspended.");
-  if (!revealedSinceReview(card)) {
+  // A reveal older than the rating window is renewed, or a card left unrated could never be rated again.
+  const fresh = revealedSinceReview(card) && now.getTime() - new Date(card.revealedAt!).getTime() <= REVEAL_WINDOW_MS;
+  if (!fresh) {
     await ConceptCard.updateOne({ _id: card._id, auth0Id: identity.userId }, { $set: { revealedAt: now } });
   }
   return NextResponse.json({ coreFact: card.coreFact, expectedKeyPoints: card.expectedKeyPoints });
