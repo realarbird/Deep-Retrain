@@ -13,7 +13,7 @@ export const BOX_INTERVALS_DAYS = [1, 3, 7, 14, 30] as const;
 export const MIN_BOX = 1;
 export const MAX_BOX = 5;
 
-/** Answers at or above this latency count as hesitation (typed answers). */
+/** Write's base time. Answers at or above a card's time count as hesitation; harder and longer cards get more. */
 export const LATENCY_THRESHOLD_MS = 12_000;
 /** Scores at or above this percentage count as accurate. */
 export const ACCURACY_THRESHOLD = 80;
@@ -28,7 +28,10 @@ export type StudyMode = (typeof STUDY_MODES)[number];
 export type Grader = "model" | "answer-key" | "self";
 
 export interface ModeRule {
-  /** Answers at or above this count as hesitation. Null when the mode sets its own pace (Listen). */
+  /**
+   * The base time: answers at or above it count as hesitation. A card gets more on top for a harder
+   * question, more to read or a longer answer (lib/answerTime.ts). Null when the mode sets its own pace (Listen).
+   */
   latencyMs: number | null;
   /** The highest box this mode can promote a card into. Box 5 always takes an answer Gemma grades. */
   topBox: number;
@@ -96,6 +99,8 @@ export interface OutcomeInput {
   box: number;
   now?: Date;
   mode?: StudyMode;
+  /** This card's time (lib/answerTime.ts). Left out, the mode's base time applies; null means no limit. */
+  latencyThresholdMs?: number | null;
   /** Count the answer as slow whatever the stopwatch says (a "Hard" self-rating). */
   forceHesitation?: boolean;
 }
@@ -119,12 +124,14 @@ export function decideOutcome({
   box,
   now = new Date(),
   mode = "write",
+  latencyThresholdMs,
   forceHesitation = false,
 }: OutcomeInput): OutcomeResult {
   const rule = MODE_RULES[mode];
+  const threshold = latencyThresholdMs === undefined ? rule.latencyMs : latencyThresholdMs;
   const currentBox = clampBox(box);
   const isAccurate = score >= ACCURACY_THRESHOLD;
-  const isFast = !forceHesitation && (rule.latencyMs === null || latencyMs < rule.latencyMs);
+  const isFast = !forceHesitation && (threshold === null || latencyMs < threshold);
 
   let outcome: ReviewOutcome;
   let newBox: number;
@@ -153,7 +160,7 @@ export function decideOutcome({
     isAccurate,
     isFast,
     boxCapped,
-    latencyThresholdMs: rule.latencyMs,
+    latencyThresholdMs: threshold,
   };
 }
 

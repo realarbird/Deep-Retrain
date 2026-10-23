@@ -107,7 +107,9 @@ function StatsBody({ stats }: { stats: Stats }) {
   const none = s.reviews === 0 ? "Nothing in this range yet. Answer a few cards and this fills in." : undefined;
   const maxMode = Math.max(1, ...stats.byMode.map((m) => m.reviews));
   const busiestHours = [...stats.byHour].filter((h) => h.reviews).sort((a, b) => b.reviews - a.reviews).slice(0, 6);
-  const latencyTop = Math.max(LATENCY_THRESHOLD_MS / 1000 + 4, ...stats.latencyTrend.map((p) => p.avg ?? 0));
+  // Every card has its own time, so the line to beat is the average your cards allowed.
+  const allowed = s.avgAllowedSeconds ?? LATENCY_THRESHOLD_MS / 1000;
+  const latencyTop = Math.max(allowed + 4, ...stats.latencyTrend.map((p) => p.avg ?? 0));
 
   return (
     <div className="space-y-6">
@@ -120,6 +122,11 @@ function StatsBody({ stats }: { stats: Stats }) {
               { label: "Answers", value: s.reviews },
               { label: "Right (80% or more)", value: pct(s.accuracy) },
               { label: "Average answer time", value: secs(s.avgSeconds) },
+              {
+                label: "Answered in time",
+                value: pct(s.inTime),
+                note: s.avgAllowedSeconds === null ? undefined : `Your cards allowed ${secs(s.avgAllowedSeconds)} on average.`,
+              },
               { label: "Days you studied", value: s.studyDays },
               { label: "Streak", value: countWords(s.streak, "day"), note: `Longest: ${countWords(s.longestStreak, "day")}.` },
               { label: "Time spent answering", value: `about ${hours(s.minutes)}` },
@@ -198,10 +205,10 @@ function StatsBody({ stats }: { stats: Stats }) {
             <>
               <LegendSwatch color={VIZ.primarySoft} label="That day" />
               <LegendItem color={VIZ.primary} label="7-day average" />
-              <LegendItem color={VIZ.threshold} label="12s mark for written answers" dashed />
+              <LegendItem color={VIZ.threshold} label="Time allowed, on average" dashed />
             </>
           }
-          chart={<TrendChart points={stats.latencyTrend} unit="s" threshold={LATENCY_THRESHOLD_MS / 1000} thresholdLabel="12s" domain={[0, Math.ceil(latencyTop / 4) * 4]} />}
+          chart={<TrendChart points={stats.latencyTrend} unit="s" threshold={allowed} thresholdLabel={`${Math.round(allowed)}s`} domain={[0, Math.ceil(latencyTop / 4) * 4]} />}
           table={
             <DataTable
               head={["Day", "Average", "7-day", "Answers"]}
@@ -304,6 +311,7 @@ function StatsBody({ stats }: { stats: Stats }) {
                   <th scope="col" className="py-1.5 font-normal">Answers</th>
                   <th scope="col" className="py-1.5 text-right font-normal">Right</th>
                   <th scope="col" className="py-1.5 text-right font-normal">Time</th>
+                  <th scope="col" className="py-1.5 text-right font-normal">In time</th>
                 </tr>
               </thead>
               <tbody className="tabular-nums">
@@ -320,6 +328,7 @@ function StatsBody({ stats }: { stats: Stats }) {
                     </td>
                     <td className="py-2 text-right text-ink">{pct(m.accuracy)}</td>
                     <td className="py-2 text-right text-ink-2">{secs(m.avgSeconds)}</td>
+                    <td className="py-2 text-right text-ink-2">{pct(m.inTime)}</td>
                   </tr>
                 ))}
               </tbody>

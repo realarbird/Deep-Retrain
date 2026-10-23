@@ -17,12 +17,13 @@ Built for the **Hacktoberfest 2026 Open-Source AI Challenge, Week 3: "Slow and S
 - marking written, spoken and teach-back answers on meaning rather than wording, and naming the key points you missed;
 - the follow-up question after a slow answer, the analogy after a wrong one, and "Explain it differently" on request.
 
-**What isn't AI, and says so in the app.** Multiple choice, true or false and fill the gap are checked against an answer key. Gemma wrote that key, or a simple rule built it from your card while Gemma's version is still on its way. Flip and Listen go by your own rating. The schedule itself is plain code in [`lib/leitner.ts`](lib/leitner.ts). **Only an answer Gemma has marked can carry a card into the last box**: the quick modes stop at box 3 or 4.
+**What isn't AI, and says so in the app.** Multiple choice, true or false and fill the gap are checked against an answer key. Gemma wrote that key, or a simple rule built it from your card while Gemma's version is still on its way. Flip and Listen go by your own rating. The schedule itself is plain code in [`lib/leitner.ts`](lib/leitner.ts). So is the time each card gives you ([`lib/answerTime.ts`](lib/answerTime.ts)), worked out from the card Gemma wrote: how hard its question is, how much there is to read, and how long its key points are. **Only an answer Gemma has marked can carry a card into the last box**: the quick modes stop at box 3 or 4.
 
 There is no closed-model fallback. Without a key or an Ollama server, an open-source heuristic grader in this repo keeps the loop going.
 
 **Rewards laziness.**
 - A daily limit (15 by default). You can lower it any time, or raise it up to 25, but a raise only starts tomorrow.
+- Time that fits the card. A synthesis question with a four-point answer gets more time than a one-line recall card, so a right answer isn't marked slow just because it took a while to type, and a card you know moves on instead of coming back early. **More time on every card** in Settings adds 25%, 50% or doubles it.
 - One-tap modes, **Auto** (it picks the mode for each card), **Just five** and hands-free **Listen**.
 - A *laziness ledger* that counts the reviews the schedule saved you.
 - An exam planner that spreads reviews out before an exam instead of piling them up the night before.
@@ -45,14 +46,14 @@ Cramming feels productive and fades within days. DeepRetain asks for about **15 
 |---|---|
 | Paste notes or import a file | Gemma splits them into concepts, key points and a first question, then writes quiz versions in the background |
 | Press **Start** | Auto picks a way to ask each due card: taps while a card is new, typing once you know it |
-| Answer fast and right | The card climbs a Leitner box (1 → 3 → 7 → 14 → 30 days), and the next question gets harder |
+| Answer right, inside the card's time | The card climbs a Leitner box (1 → 3 → 7 → 14 → 30 days), and the next question gets harder |
 | Answer right but slowly | The card stays put, and a written answer gets a follow-up question |
 | Answer wrong | Back to box 1, with the right answer. Written answers also get an analogy that fixes the misconception; the quick modes offer one on request |
 | Reach your daily limit | Reviews lock until tomorrow, with a countdown |
 
 ## Nine ways to study
 
-| Mode | What you do | Marked by | "Fast" means under | Can carry a card to |
+| Mode | What you do | Marked by | Time starts at | Can carry a card to |
 |---|---|---|---|---|
 | **Auto** (default) | Box 1: multiple choice. Box 2: fill the gap. Box 3 and up: write, or say it if you prefer | per mode | | |
 | **Multiple choice** | Pick one of four (keys 1–4) | answer key | 8 s | box 3 |
@@ -64,6 +65,8 @@ Cramming feels productive and fades within days. DeepRetain asks for about **15 
 | **Teach it back** | Explain it to someone who's never heard of it | Gemma, with a teaching rubric | 90 s | box 5 |
 | **Listen** | Hands-free: it reads the question, waits, then reads the answer. Rating is optional; skip it and nothing is logged | your rating | | box 4 |
 
+Harder questions, longer reads and longer answers get more time than that; see [Time for each card](#time-for-each-card).
+
 After a session you can play a **cool-down match**: five titles against five facts, using only cards you just answered. It isn't marked or logged.
 
 Every marked mode counts toward the daily limit, moves the card and logs the review. Sessions take 5, 10, 15 or everything left today, optionally from one deck. Overdue cards come first, then decks with an exam in the next week, then the decks take turns.
@@ -72,19 +75,44 @@ Every marked mode counts toward the daily limit, moves the card and logs the rev
 
 **No peeking.** Questions are sent without their answers; the answer key never leaves the server before you answer. Flip and Listen fetch the answer with a separate *reveal* call. A card whose answer you've seen can then only be rated, never marked as if you'd recalled it.
 
+## Time for each card
+
+The stopwatch runs from the moment a card appears until you answer, so it covers reading, remembering and typing or saying the answer. One limit per mode can't be fair to both a one-line recall card and a synthesis question with a four-point answer, so every card starts from its mode's base time and gets buffers on top:
+
+| Mode | Base | Harder question (application / synthesis) | More to read | Longer answer | On a phone or tablet | Most |
+|---|---|---|---|---|---|---|
+| Write | 12 s | +4 s / +8 s | 0.25 s a word past the question's first 12 | 1.2 s a key-point word past the first 10 | +0.4 s a key-point word | 90 s |
+| Say it | 15 s | +4 s / +8 s | 0.25 s a word past 12 | 0.5 s a key-point word past 10 | | 60 s |
+| Teach it back | 90 s | | | 2.5 s a key-point word past 15 | +1 s a key-point word | 240 s |
+| Flip | 8 s | +3 s / +6 s | 0.25 s a word past 12 | 0.2 s a key-point word past 10 | | 30 s |
+| Multiple choice | 8 s | | 0.25 s a word past 20, question and options together | | | 30 s |
+| True or false | 6 s | | 0.25 s a word past 12 | | | 20 s |
+| Fill the gap | 10 s | | 0.25 s a word past 15 | | +2 s | 25 s |
+
+- **Never less than before.** Buffers only add, so a short recall card keeps its mode's base time.
+- **How long the answer needs to be** comes from the card's key points, since a full answer mentions each of them. Fill the gap leaves the missing word out of it: the time is on screen before you answer, so it mustn't hint.
+- **On a phone or tablet** (as the browser reports it), typing gets a little more, because typing on glass is slower.
+- **More time on every card** in Settings (none, +25%, +50% or double) scales the result, and Listen's pause, like extra time in an exam. Times round up to a whole second.
+- **Listen** has no limit, but it waits longer before reading the answer: +2 s for an application question, +4 s for synthesis, and 0.2 s a key-point word past 10, up to 8 s on top of your pause.
+- **The server decides.** The study screen shows the time next to the stopwatch ("12.3s / 34s"), and the grader works it out again from the card when you answer, so the browser's copy is never trusted. Each review log keeps the time it was marked against.
+
+For example, the sample card *Cellular Respiration* has 28 words of key points. In Write it gets 34 s for its recall question, 40 s for the application question and 44 s for synthesis, and 45 s for recall on a phone. Across the sample decks, Write gives 20 to 48 s, multiple choice 11 to 15 s and true or false 6 to 12 s.
+
+All the numbers sit in one table in [`lib/answerTime.ts`](lib/answerTime.ts).
+
 ## The numbers (Stats tab)
 
 One filter row (30 days, 90 days or a year, and a deck). Every chart has a table view.
 
-- **The short version:** answers, how often you're right, average answer time, days studied, current and longest streak, time spent answering, sessions, days you hit the limit.
+- **The short version:** answers, how often you're right, average answer time, how often you answer inside the card's time, days studied, current and longest streak, time spent answering, sessions, days you hit the limit.
 - **The laziness ledger:** how many reviews you did against re-reading every card every day, and the minutes that saved.
 - **Study calendar:** 26 weeks, each day shaded by how much of your daily limit you used.
-- **How often you're right** and **how quickly you answer:** daily averages with a 7-day line. Two charts, never a dual axis.
+- **How often you're right** and **how quickly you answer:** daily averages with a 7-day line, against 80% and against the average time your cards allowed. Two charts, never a dual axis.
 - **Coming up:** the next two weeks of due cards against your limit. Anything over the limit is shown waiting a day.
 - **What each week's answers did:** moved up, stayed, or back to box 1.
 - **How much you'd remember right now:** estimated recall per card, and how many cards are new, learning, taking hold or long-term.
 - **Does the schedule hold?** Pass rate by box.
-- **How you study:** answers, accuracy and time for each mode.
+- **How you study:** answers, accuracy, time and how often you're inside the card's time, for each mode.
 - **Do you know what you know?** With "Ask how sure I am" on, accuracy by confidence, plus thinking time before the first key against typing time.
 - **When and where you study:** a weekday-by-hour punch card, and answers by device and weekday.
 - **Cards that keep slipping** (sent back to box 1 at least twice) and **cards getting quicker**.
@@ -100,7 +128,7 @@ Sign in on any device and carry on where you left off.
 
 | What | Where it lives | Auth0 `app_metadata` key |
 |---|---|---|
-| Settings: daily limit, starting mode, session length, timer, confidence prompt, handwriting, listening speed and pause, theme, reduced motion | Auth0 | `deepretain_settings` |
+| Settings: daily limit, starting mode, session length, timer, extra time, confidence prompt, handwriting, listening speed and pause, theme, reduced motion | Auth0 | `deepretain_settings` |
 | Devices you study on (up to 6, named by the server from the browser's user agent) | Auth0 | `deepretain_devices` |
 | Progress summary: cards, due, box 5, reviews, streaks, up to 10 decks with exam dates | Auth0 | `deepretain_progress` |
 | Your Google AI Studio key, sealed with AES-256-GCM | Auth0 | `deepretain_google_ai_key` |
@@ -141,7 +169,7 @@ Give a deck an exam date in the Cards tab. Reviews that would land on or after t
 - **Keys are encrypted before they reach Auth0.** The browser sends the key over HTTPS. The server checks it with Google, seals it with AES-256-GCM (key derived from `AUTH0_SECRET` with HKDF, bound to the learner's Auth0 `sub`), and stores only the sealed value in the user's Auth0 `app_metadata` through the Management API. It is never stored in MongoDB and never returned in full.
 - **Note import.** Markdown and text are read as-is; PDFs go through `unpdf` and Word files through `mammoth`. The extracted text lands in the editor to check before cards are made, and the file isn't kept.
 - **Quiz versions in the background.** After cards are made, Gemma writes their multiple-choice, fill-the-gap and true-or-false versions in batches of 8, without holding up the response. Cards that are about to be due get theirs when a session starts. Editing a card throws its versions away so they're written again.
-- **Latency-aware review.** A quiet stopwatch (it can be hidden) measures time to answer and pauses while the tab is hidden. Each mode has its own idea of "fast".
+- **Latency-aware review.** A quiet stopwatch (it can be hidden) measures time to answer and pauses while the tab is hidden. Each card has its own idea of "fast": its mode's base time, plus more for a harder question, more to read or a longer answer ([Time for each card](#time-for-each-card)).
 - **Adaptive difficulty.** Box 1 asks *recall* questions, box 2 *application*, box 3 and up *synthesis*. On promotion, Gemma writes the next, harder question, often linking the concept to a related one from your own deck.
 - **Identity-scoped RAG.** Related concepts come from Atlas Vector Search, **pre-filtered by the signed-in Auth0 `sub`** and re-checked before anything reaches the prompt.
 - **Cramming vs DeepRetain** on the landing page: modeled recall of one concept over six weeks. The crammer studies for an exam on **day 28**, then crams again on **day 40**, the night before the **AP Exam on day 41**, but that burst only gets recall back to 25%. DeepRetain teaches the concept on day 0 and reviews it on days 1, 4, 11 and 25.
@@ -162,7 +190,7 @@ flowchart LR
     K["lib/aiKey + lib/secretBox<br/>AES-256-GCM seal"]
     E["lib/engine.ts<br/>provider chain"]
     PR["lib/practice.ts<br/>quiz versions + answer key"]
-    L["lib/leitner.ts + lib/examPlan.ts<br/>score + latency + mode → box"]
+    L["lib/leitner.ts + lib/answerTime.ts<br/>+ lib/examPlan.ts<br/>score + latency vs the card's time → box"]
     R["lib/retrieval.ts<br/>identity-scoped RAG"]
   end
 
@@ -210,7 +238,7 @@ sequenceDiagram
   else Flip, Listen
     S->>S: use the learner's rating
   end
-  S->>S: decideOutcome(score, latency, box, mode), exam window
+  S->>S: the card's time (answerTime), decideOutcome(score, latency, box, mode), exam window
   S-->>A: outcome, next review date, what to look at next
 ```
 
@@ -218,8 +246,8 @@ sequenceDiagram
 
 | Accuracy | Latency | Outcome | Box | Next review |
 |---|---|---|---|---|
-| ≥ 80% | under the mode's limit | **Promote**, and a harder question for the next box | +1, up to the mode's highest box | 1 / 3 / 7 / 14 / 30 days by new box |
-| ≥ 80% | at or over the limit | **Hesitation**: a follow-up question for written answers | unchanged | current box interval |
+| ≥ 80% | inside the card's time | **Promote**, and a harder question for the next box | +1, up to the mode's highest box | 1 / 3 / 7 / 14 / 30 days by new box |
+| ≥ 80% | at or over the card's time | **Hesitation**: a follow-up question for written answers | unchanged | current box interval |
 | < 80% | any | **Reset**: the right answer, and an analogy (on request in the quick modes) | 1 | 1 day |
 
 A correct answer never moves a card down. New concepts are due right away for their first recall pass, then follow the box intervals.
@@ -243,7 +271,7 @@ Every response reports the engine that produced it, and the app shows it under e
 | Data | MongoDB Atlas with Mongoose 9 and Atlas Vector Search (384-dim, cosine, filtered by `auth0Id`) |
 | Auth and sync | `@auth0/nextjs-auth0` v4, plus the Auth0 Management API for `app_metadata`; Demo Mode for judges |
 | Deploy | Render Blueprint (`render.yaml`) |
-| Tests | Vitest: Leitner and mode rules, practice items and answer matching, the study queue, the exam planner, stats (including daylight-saving days), retention maths, pacer, settings and device sync, Auth0 metadata caching and back-off, key sealing, file import, route tests for review, study, settings, dashboard and cards, copy rules, and the theme script. Route tests run against an in-memory MongoDB stand-in built on [`mingo`](https://github.com/kofrasa/mingo) (dev dependency only) |
+| Tests | Vitest: Leitner and mode rules, the time for each card, practice items and answer matching, the study queue, the exam planner, stats (including daylight-saving days), retention maths, pacer, settings and device sync, Auth0 metadata caching and back-off, key sealing, file import, route tests for review, study, settings, dashboard and cards, copy rules, and the theme script. Route tests run against an in-memory MongoDB stand-in built on [`mingo`](https://github.com/kofrasa/mingo) (dev dependency only) |
 
 ## Run it locally
 
@@ -261,7 +289,7 @@ npm run db:vector-index     # creates the Atlas Vector Search index and waits un
 npm run dev                 # http://localhost:3000
 ```
 
-Open the app and click **Try the demo**. Press **Start** to let Auto pick, or **Pick a way to study** to try each mode. Answer quickly and correctly to see a promotion, take your time on a written answer to get a follow-up question, or answer wrong to get the right answer and an analogy. To add your own notes, sign in and save your AI key in **Settings**.
+Open the app and click **Try the demo**. Press **Start** to let Auto pick, or **Pick a way to study** to try each mode. Answer correctly inside the time shown by the stopwatch to see a promotion, go past it on a written answer to get a follow-up question, or answer wrong to get the right answer and an analogy. To add your own notes, sign in and save your AI key in **Settings**.
 
 ### Scripts
 
@@ -314,7 +342,7 @@ Free-tier keys have rate limits; when a learner hits one, marking falls back to 
 3. Fill in the prompted secrets. `MONGODB_URI` is required, the rest are optional. `AUTH0_SECRET` is generated for you. Don't copy `APP_BASE_URL=http://localhost:3000` from `.env.example`: leave it unset and the app uses Render's external URL.
 4. Add `https://<service>.onrender.com/auth/callback` to your Auth0 application, and authorize it for the Management API (step 4 above).
 
-No new environment variables are needed for the study modes, stats or account sync.
+No new environment variables are needed for the study modes, the time for each card, stats or account sync.
 
 ## Demo Mode
 
@@ -326,8 +354,8 @@ Sample decks come with hand-written fill-the-gap words and false statements for 
 
 | Route | Purpose |
 |---|---|
-| `GET /api/study?mode=&size=&deck=&tz=&tzName=` | A session: due cards in order, each with the mode it will be asked in and only what's needed to ask it. Starts quiz-version writing for cards that need it |
-| `POST /api/review` | `mode` is one of `write`, `voice`, `teach` (`answer`), `choice` (`choice`, `practiceVersion`), `truefalse` (`statementId`, `answer`), `cloze` (`answer`), `flip` or `listen` (`rating`, after a reveal), plus `cardId`, `latencyMs` and an optional `attemptId`, `sessionId`, `confidence`, `thinkMs`. Also `reveal` (show a Flip or Listen answer), `explain` (Gemma explains a missed card another way) and `followup` (reply to a follow-up question). The original `{ mode: "answer" }` payload still works as Write |
+| `GET /api/study?mode=&size=&deck=&tz=&tzName=` | A session: due cards in order, each with the mode it will be asked in, only what's needed to ask it, and its time (`latencyThresholdMs`, or for Listen `listenExtraSec`). Starts quiz-version writing for cards that need it |
+| `POST /api/review` | `mode` is one of `write`, `voice`, `teach` (`answer`), `choice` (`choice`, `practiceVersion`), `truefalse` (`statementId`, `answer`), `cloze` (`answer`), `flip` or `listen` (`rating`, after a reveal), plus `cardId`, `latencyMs` and an optional `attemptId`, `sessionId`, `confidence`, `thinkMs`. Also `reveal` (show a Flip or Listen answer), `explain` (Gemma explains a missed card another way) and `followup` (reply to a follow-up question). The result's `latencyThresholdMs` is the time the card allowed. The original `{ mode: "answer" }` payload still works as Write |
 | `GET /api/dashboard?tz=&tzName=` | Today: due cards, boxes, the tally, the daily limit, the week ahead, the nearest exam, settings and sync status. Removes sample decks from signed-in accounts |
 | `GET /api/stats?range=30\|90\|365&deck=&tz=&tzName=` | Everything on the Stats tab |
 | `GET /api/cards?deck=&q=&status=due\|suspended` | Your cards, with estimated recall |
@@ -361,6 +389,7 @@ components/
 lib/engine.ts          Cards from notes · marking · quiz versions · explanations
 lib/ai/                Google AI Studio / Ollama / heuristic providers, prompts, embeddings
 lib/leitner.ts         Box rules (accuracy × latency × mode)
+lib/answerTime.ts      Time for each card: base time plus buffers
 lib/practice.ts        Quiz versions, answer key and answer matching
 lib/studyQueue.ts      Session order and the mode for each card
 lib/reviewFlow.ts      Marking for the answer-key and self-rated modes

@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, userAgent, type NextRequest } from "next/server";
 import { effectiveDailyCapFor, getAccountState } from "@/lib/account";
 import { safeAfter, withIdentity } from "@/lib/api";
 import { dueCards, activeCards } from "@/lib/cardQueries";
+import { isTouchDevice } from "@/lib/devices";
 import { storedPractice, type Sibling } from "@/lib/practice";
 import { fillPractice } from "@/lib/practiceJobs";
 import { getCapStatus } from "@/lib/study";
@@ -55,6 +56,8 @@ export const GET = withIdentity(async (identity, request: NextRequest) => {
     zone,
     freeRecall: account.settings.freeRecall,
     speech: q.speech === "1",
+    touch: isTouchDevice(userAgent(request)),
+    extraTime: account.settings.extraTime,
   });
 
   // Gemma writes practice items for this session's cards and the next day's, without holding up the response.

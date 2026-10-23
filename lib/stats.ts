@@ -3,7 +3,7 @@
  * number on the Stats tab can be tested without a database.
  */
 import { deckReadiness, daysUntilExam, forecastDue, type ForecastDay, type Readiness } from "@/lib/examPlan";
-import { ACCURACY_THRESHOLD, STUDY_MODES, type StudyMode } from "@/lib/leitner";
+import { ACCURACY_THRESHOLD, MODE_RULES, STUDY_MODES, type StudyMode } from "@/lib/leitner";
 import { dailyAverageTrend, recallAt, type DailyAveragePoint } from "@/lib/retention";
 import { addDays, daysBetween, localParts, startOfLocalDay, weekdayOf, type Zone } from "@/lib/timezone";
 
@@ -34,6 +34,8 @@ export interface StatLog {
   reviewedAt: Date;
   score: number;
   responseLatencyMs: number;
+  /** The time the card allowed. Older logs have none. */
+  latencyThresholdMs?: number | null;
   outcome: string;
   boxBefore: number;
   mode?: string | null;
@@ -85,6 +87,8 @@ const modeOf = (log: StatLog): StudyMode => (STUDY_MODES as readonly string[]).i
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const pct = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : null);
 const round1 = (n: number | null) => (n === null ? null : Math.round(n * 10) / 10);
+/** The time the card allowed: its own, or for older logs the mode's base. Null when the mode sets its own pace. */
+const allowedMs = (log: StatLog): number | null => log.latencyThresholdMs ?? MODE_RULES[modeOf(log)].latencyMs;
 
 // ── Calendar ─────────────────────────────────────────────────────────────
 
@@ -187,6 +191,20 @@ export interface ModeRow {
   /** Share of answers scoring 80 or more. */
   accuracy: number | null;
   avgSeconds: number | null;
+  /** Share of answers inside their card's time. */
+  inTime: number | null;
+}
+
+/** How often answers came in under their card's time, and how much time cards allowed on average. Listen is left out. */
+export function timeKept(logs: StatLog[]): { inTime: number | null; avgAllowedSeconds: number | null } {
+  const timed = logs.flatMap((l) => {
+    const allowed = allowedMs(l);
+    return allowed === null ? [] : [{ allowed, inTime: l.responseLatencyMs < allowed }];
+  });
+  return {
+    inTime: pct(timed.filter((t) => t.inTime).length, timed.length),
+    avgAllowedSeconds: round1(mean(timed.map((t) => t.allowed / 1000))),
+  };
 }
 
 export function byMode(logs: StatLog[]): ModeRow[] {
@@ -200,6 +218,7 @@ export function byMode(logs: StatLog[]): ModeRow[] {
         reviews: ls.length,
         accuracy: pct(ls.filter(passed).length, ls.length),
         avgSeconds: round1(mean(ls.map((l) => l.responseLatencyMs / 1000))),
+        inTime: timeKept(ls).inTime,
       };
     })
     .sort((a, b) => b.reviews - a.reviews);
@@ -480,6 +499,9 @@ export interface Stats {
     accuracy: number | null;
     avgScore: number | null;
     avgSeconds: number | null;
+    /** Share of timed answers inside their card's time. */
+    inTime: number | null;
+    avgAllowedSeconds: number | null;
     studyDays: number;
     streak: number;
     longestStreak: number;
@@ -528,6 +550,7 @@ export function buildStats({ logs, cards, decks, now, zone, cap, usedToday, rang
       accuracy: pct(inRange.filter(passed).length, inRange.length),
       avgScore: inRange.length ? Math.round(mean(inRange.map((l) => l.score))!) : null,
       avgSeconds: round1(mean(inRange.map((l) => l.responseLatencyMs / 1000))),
+      ...timeKept(inRange),
       studyDays: new Set(inRange.map((l) => localParts(l.reviewedAt, zone).dateKey)).size,
       streak: current,
       longestStreak: longest,

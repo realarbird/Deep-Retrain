@@ -83,7 +83,11 @@ export function Stopwatch({ elapsedMs, frozen, thresholdMs }: { elapsedMs: numbe
       ) : (
         <span
           className="inline-flex items-center gap-2"
-          title={limit ? `Answer time. Under ${limit}s with a good answer moves the card up a box.` : "This mode sets its own pace."}
+          title={
+            limit
+              ? `This card gets ${limit}s: more for a harder question, more to read, or a longer answer. A good answer inside that moves it up a box.`
+              : "This mode sets its own pace."
+          }
         >
           {limit > 0 && (
             <svg viewBox="0 0 24 24" className="size-5 -rotate-90" aria-hidden>
@@ -101,7 +105,10 @@ export function Stopwatch({ elapsedMs, frozen, thresholdMs }: { elapsedMs: numbe
               />
             </svg>
           )}
-          <span className="w-12 tabular-nums text-ink-2">{seconds.toFixed(1)}s</span>
+          <span className="tabular-nums">
+            <span className="inline-block w-12 text-ink-2">{seconds.toFixed(1)}s</span>
+            {limit > 0 && <span className="text-ink-3">/ {limit}s</span>}
+          </span>
         </span>
       )}
       <button

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { answerTimeMs } from "@/lib/answerTime";
 import { heuristicChoice, toStoredPractice, type ResolvedPractice } from "@/lib/practice";
-import { buildSession, orderDue, pickMode, revealedSinceReview, type QueueCard } from "@/lib/studyQueue";
+import { buildSession, cardAnswerTimeMs, orderDue, pickMode, promptText, revealedSinceReview, type QueueCard } from "@/lib/studyQueue";
 
 const NOW = new Date("2026-10-23T15:00:00.000Z");
 const ZONE = { name: "America/New_York", offsetMinutes: 240 };
@@ -102,6 +103,35 @@ describe("buildSession", () => {
     const others = siblings.get("d1")!.filter((s) => s.conceptTitle !== deck[0].conceptTitle);
     expect(item.prompt).toEqual({ kind: "choice", ...(({ question, options }) => ({ question, options }))(heuristicChoice(deck[0], others)!) });
     expect(item.practiceVersion).toMatch(/^h:[0-9a-f]{16}$/);
+  });
+
+  it("sends each card's own time, worked out the way the grader will", () => {
+    const long = card({
+      leitnerBox: 3,
+      difficultyTier: "synthesis",
+      expectedKeyPoints: ["one two three four five six seven eight", "nine ten eleven twelve thirteen fourteen fifteen sixteen"],
+    });
+    const decks = [{ _id: "d1", title: "Deck" }];
+    const [item] = buildSession([long], decks, siblings, { ...base, requested: "write", limit: 1 });
+    expect(item.latencyThresholdMs).toBe(cardAnswerTimeMs(long, "write"));
+    expect(item.latencyThresholdMs).toBeGreaterThan(12_000);
+
+    const [phone] = buildSession([long], decks, siblings, { ...base, requested: "write", limit: 1, touch: true, extraTime: 50 });
+    expect(phone.latencyThresholdMs).toBe(cardAnswerTimeMs(long, "write", { touch: true, extraTime: 50 }));
+    expect(phone.latencyThresholdMs!).toBeGreaterThan(item.latencyThresholdMs!);
+  });
+
+  it("times a quick mode by what it shows", () => {
+    const [item] = buildSession([deck[0]], [{ _id: "d1", title: "Deck" }], siblings, { ...base, requested: "choice", limit: 1 });
+    expect(item.mode).toBe("choice");
+    expect(item.latencyThresholdMs).toBe(answerTimeMs({ mode: "choice", tier: "recall", prompt: promptText(item.prompt), expectedKeyPoints: deck[0].expectedKeyPoints }));
+  });
+
+  it("gives Listen no time limit, and a longer pause on a harder card", () => {
+    const [hard] = buildSession([card({ leitnerBox: 3, difficultyTier: "synthesis" })], [], siblings, { ...base, requested: "listen", limit: 1 });
+    expect(hard).toMatchObject({ mode: "listen", latencyThresholdMs: null, listenExtraSec: 4 });
+    const [other] = buildSession([card()], [], siblings, { ...base, requested: "write", limit: 1 });
+    expect(other.listenExtraSec).toBe(0);
   });
 
   it("stops at the limit, and never past 25", () => {

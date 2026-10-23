@@ -34,7 +34,7 @@ function seed() {
     { _id: OTHER, auth0Id: "auth0|mallory", deckId: "f".repeat(24), conceptTitle: "Theirs", coreFact: "x", expectedKeyPoints: [], currentQuestion: "q", leitnerBox: 1, nextReviewDate: new Date() },
   ]);
   fakeDb.ReviewLog.reset([
-    { auth0Id: alice.userId, cardId: CARD, deckId: DECK, conceptTitle: "Glycolysis", score: 90, responseLatencyMs: 4000, outcome: "promote", boxBefore: 2, boxAfter: 3, reviewedAt: new Date(), replay: { secret: true } },
+    { auth0Id: alice.userId, cardId: CARD, deckId: DECK, conceptTitle: "Glycolysis", score: 90, responseLatencyMs: 4000, latencyThresholdMs: 27000, outcome: "promote", boxBefore: 2, boxAfter: 3, reviewedAt: new Date(), replay: { secret: true } },
   ]);
 }
 
@@ -144,8 +144,8 @@ describe("export", () => {
   it("exports reviews as CSV", async () => {
     const { GET } = await import("@/app/api/export/route");
     const text = await (await GET(json("GET", "http://test/api/export?format=reviews.csv"))).text();
-    expect(text.split("\r\n")[0]).toBe("When,Deck,Concept,Mode,Score,Seconds,Outcome,Box before,Box after,Graded by,Confidence,Device,Simulated");
-    expect(text).toContain(",Bio,Glycolysis,write,90,4,promote,2,3,");
+    expect(text.split("\r\n")[0]).toBe("When,Deck,Concept,Mode,Score,Seconds,Seconds allowed,Outcome,Box before,Box after,Graded by,Confidence,Device,Simulated");
+    expect(text).toContain(",Bio,Glycolysis,write,90,4,27,promote,2,3,");
   });
 });
 

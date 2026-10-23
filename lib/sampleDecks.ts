@@ -191,6 +191,7 @@ export async function seedSampleDeck(
           userAnswer: "",
           score: h.score,
           responseLatencyMs: h.latencyMs,
+          latencyThresholdMs: decision.latencyThresholdMs,
           outcome: decision.outcome,
           boxBefore,
           boxAfter: decision.newBox,

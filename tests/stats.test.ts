@@ -12,6 +12,7 @@ import {
   punchCard,
   sessions,
   streaks,
+  timeKept,
   type StatCard,
   type StatLog,
 } from "@/lib/stats";
@@ -94,6 +95,21 @@ describe("habits", () => {
     expect(byDevice([log("2026-10-23T10:00:00Z")])[0]).toMatchObject({ label: "Unknown", reviews: 1 });
   });
 
+  it("counts answers in time against each card's own time, and the mode's base time for older logs", () => {
+    const logs = [
+      log("2026-10-23T10:00:00Z", { latencyThresholdMs: 30_000, responseLatencyMs: 25_000 }),
+      // At the card's time counts as slow, the same as when it was marked.
+      log("2026-10-23T10:01:00Z", { latencyThresholdMs: 30_000, responseLatencyMs: 30_000 }),
+      // Logged before cards had their own time: Write's base 12 seconds.
+      log("2026-10-23T10:02:00Z", { responseLatencyMs: 10_000 }),
+      // Listen sets its own pace, so it's left out.
+      log("2026-10-23T10:03:00Z", { mode: "listen", latencyThresholdMs: null, responseLatencyMs: 90_000 }),
+    ];
+    expect(timeKept(logs)).toEqual({ inTime: 67, avgAllowedSeconds: 24 });
+    expect(byMode(logs).find((m) => m.mode === "write")).toMatchObject({ reviews: 3, inTime: 67 });
+    expect(byMode(logs).find((m) => m.mode === "listen")).toMatchObject({ reviews: 1, inTime: null });
+  });
+
   it("fills a 7 by 24 punch card", () => {
     const grid = punchCard([log("2026-10-23T15:00:00Z")], UTC);
     expect(grid).toHaveLength(168);
@@ -160,7 +176,7 @@ describe("buildStats", () => {
       usedToday: 1,
       rangeDays: 30,
     });
-    expect(stats.summary).toMatchObject({ reviews: 2, accuracy: 50, studyDays: 2, streak: 2 });
+    expect(stats.summary).toMatchObject({ reviews: 2, accuracy: 50, studyDays: 2, streak: 2, inTime: 100, avgAllowedSeconds: 10 });
     expect(stats.calibration.find((c) => c.confidence === 3)).toMatchObject({ reviews: 1, accuracy: 100 });
     expect(stats.byMode.map((m) => m.mode).sort()).toEqual(["choice", "write"]);
     expect(stats.thinking).toEqual({ thinkSeconds: 2, typeSeconds: 4, samples: 1 });

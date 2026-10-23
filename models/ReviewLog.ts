@@ -10,6 +10,8 @@ const reviewLogSchema = new Schema(
     userAnswer: { type: String, default: "" },
     score: { type: Number, required: true },
     responseLatencyMs: { type: Number, required: true },
+    /** The time this card allowed before a right answer counted as slow. Older logs have none: use the mode's base time. */
+    latencyThresholdMs: { type: Number, default: null },
     outcome: { type: String, enum: ["promote", "hesitation", "reset"], required: true },
     boxBefore: { type: Number, required: true },
     boxAfter: { type: Number, required: true },

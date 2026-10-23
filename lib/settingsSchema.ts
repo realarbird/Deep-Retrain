@@ -17,6 +17,10 @@ export const SESSION_SIZES = [5, 10, 15, "all"] as const;
 export type SessionSize = (typeof SESSION_SIZES)[number];
 export const THEMES = ["system", "light", "dark"] as const;
 export type ThemeSetting = (typeof THEMES)[number];
+/** "More time on every card", in percent, like extra time in an exam. */
+export const EXTRA_TIME = [0, 25, 50, 100] as const;
+export type ExtraTime = (typeof EXTRA_TIME)[number];
+const extraTimeSchema = z.union([z.literal(0), z.literal(25), z.literal(50), z.literal(100)]);
 
 const speechSchema = z.object({
   rate: z.number().min(0.6).max(1.4),
@@ -34,6 +38,8 @@ export const settingsSchema = z.object({
   freeRecall: z.enum(["write", "voice"]),
   sessionSize: z.union([z.literal(5), z.literal(10), z.literal(15), z.literal("all")]),
   showTimer: z.boolean(),
+  /** Added to every card's time to answer. */
+  extraTime: extraTimeSchema,
   askConfidence: z.boolean(),
   handwriting: z.boolean(),
   speech: speechSchema,
@@ -51,6 +57,7 @@ export const settingsPatchSchema = z
     freeRecall: z.enum(["write", "voice"]),
     sessionSize: z.union([z.literal(5), z.literal(10), z.literal(15), z.literal("all")]),
     showTimer: z.boolean(),
+    extraTime: extraTimeSchema,
     askConfidence: z.boolean(),
     handwriting: z.boolean(),
     speech: speechSchema.partial(),
@@ -75,6 +82,7 @@ export function defaultSettings(cap = DEFAULT_CAP): Settings {
     freeRecall: "write",
     sessionSize: 10,
     showTimer: true,
+    extraTime: 0,
     askConfidence: false,
     handwriting: true,
     speech: { rate: 1, pauseSec: 5 },

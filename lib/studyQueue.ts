@@ -2,6 +2,7 @@
  * Building a study session: which cards, in what order, and how each one is
  * asked. Pure, so the "no answers leave the server" rule can be tested.
  */
+import { answerTimeMs, listenExtraSec, type AnswerTimeInput } from "@/lib/answerTime";
 import { daysUntilExam } from "@/lib/examPlan";
 import type { DifficultyTier, StudyMode } from "@/lib/leitner";
 import {
@@ -55,7 +56,14 @@ export interface StudyItem {
   mode: StudyMode;
   prompt: StudyPrompt;
   practiceVersion: string;
+  /** This card's time: a right answer at or over it counts as slow. Null when the mode sets its own pace. */
+  latencyThresholdMs: number | null;
+  /** Listen only: seconds added to the learner's pause before the answer is read. */
+  listenExtraSec: number;
 }
+
+/** Typing on a phone or tablet, and the learner's extra time. */
+export type AnswerTimeOptions = Pick<AnswerTimeInput, "touch" | "extraTime">;
 
 /** The answer was shown (Flip or Listen) but never rated: the card can only be rated now. */
 export function revealedSinceReview(card: Pick<QueueCard, "revealedAt" | "lastReviewedAt">): boolean {
@@ -152,21 +160,56 @@ export function buildPrompt(card: QueueCard, mode: StudyMode, practice: Resolved
   return { kind: "open", question: card.currentQuestion };
 }
 
+/** Everything the learner reads before answering. */
+export function promptText(prompt: StudyPrompt): string {
+  switch (prompt.kind) {
+    case "choice":
+      return [prompt.question, ...prompt.options].join("\n");
+    case "truefalse":
+      return prompt.statement;
+    case "cloze":
+      return prompt.text;
+    default:
+      return prompt.question;
+  }
+}
+
+export function tierOf(card: Pick<QueueCard, "difficultyTier">): DifficultyTier {
+  return (["recall", "application", "synthesis"].includes(card.difficultyTier) ? card.difficultyTier : "recall") as DifficultyTier;
+}
+
+/** Write, Say it, Teach it back, Flip and Listen show the same thing whatever practice items exist. */
+const NO_PRACTICE: ResolvedPractice = { choice: null, cloze: null, trueFalse: null, source: "heuristic" };
+
+/** The card's time in `mode`, from what it shows in that mode. The study screen and the grader both use this. */
+export function cardAnswerTimeMs(
+  card: QueueCard,
+  mode: StudyMode,
+  time: AnswerTimeOptions = {},
+  practice: ResolvedPractice = NO_PRACTICE,
+): number | null {
+  return answerTimeMs({ mode, tier: tierOf(card), prompt: promptText(buildPrompt(card, mode, practice)), expectedKeyPoints: card.expectedKeyPoints, ...time });
+}
+
 /** Allow-listed fields only: no core fact, key points, answer index or cloze answers. */
-export function toStudyItem(card: QueueCard, mode: StudyMode, practice: ResolvedPractice, deckTitle: string): StudyItem {
+export function toStudyItem(card: QueueCard, mode: StudyMode, practice: ResolvedPractice, deckTitle: string, time: AnswerTimeOptions = {}): StudyItem {
   const prompt = buildPrompt(card, mode, practice);
+  // A quick mode whose item couldn't be built is asked as Write.
+  const asked: StudyMode = prompt.kind === "open" && (mode === "choice" || mode === "truefalse" || mode === "cloze") ? "write" : mode;
   return {
     id: String(card._id),
     deckId: String(card.deckId),
     deckTitle,
     conceptTitle: card.conceptTitle,
     box: card.leitnerBox,
-    tier: (["recall", "application", "synthesis"].includes(card.difficultyTier) ? card.difficultyTier : "recall") as DifficultyTier,
+    tier: tierOf(card),
     reviewCount: card.reviewCount ?? 0,
     lastLatencyMs: card.latencyHistory?.at(-1) ?? null,
-    mode: prompt.kind === "open" && (mode === "choice" || mode === "truefalse" || mode === "cloze") ? "write" : mode,
+    mode: asked,
     prompt,
     practiceVersion: `${practice.source === "stored" ? "s" : "h"}:${cardSourceHash(card)}`,
+    latencyThresholdMs: cardAnswerTimeMs(card, asked, time, practice),
+    listenExtraSec: asked === "listen" ? listenExtraSec({ tier: tierOf(card), expectedKeyPoints: card.expectedKeyPoints }) : 0,
   };
 }
 
@@ -182,7 +225,9 @@ export function buildSession(
     zone,
     freeRecall,
     speech,
-  }: { requested: DefaultMode; limit: number; now: Date; zone: Zone; freeRecall: "write" | "voice"; speech: boolean },
+    touch = false,
+    extraTime = 0,
+  }: { requested: DefaultMode; limit: number; now: Date; zone: Zone; freeRecall: "write" | "voice"; speech: boolean } & AnswerTimeOptions,
 ): StudyItem[] {
   const titles = new Map(decks.map((d) => [String(d._id), d.title]));
   return orderDue(cards, decks, now, zone)
@@ -191,6 +236,6 @@ export function buildSession(
       const siblings = (siblingsByDeck.get(String(card.deckId)) ?? []).filter((s) => s.conceptTitle !== card.conceptTitle);
       const practice = resolvePractice(card, siblings);
       const mode = pickMode(requested, card, { freeRecall, speech, practice });
-      return toStudyItem(card, mode, practice, titles.get(String(card.deckId)) ?? "");
+      return toStudyItem(card, mode, practice, titles.get(String(card.deckId)) ?? "", { touch, extraTime });
     });
 }

@@ -62,6 +62,11 @@ export function describeDevice(agent: ParsedAgent): { kind: DeviceKind; label: s
   return { kind, label: browser ? `${browser} on ${place}` : place };
 }
 
+/** Phones and tablets type on glass, which is slower; typed answers get a little more time there. */
+export function isTouchDevice(agent: ParsedAgent): boolean {
+  return describeDevice(agent).kind !== "desktop";
+}
+
 /** Record a sighting. `changed` is false when nothing worth writing to Auth0 happened. */
 export function upsertDevice(
   devices: DeviceInfo[],
