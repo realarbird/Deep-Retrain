@@ -9,7 +9,7 @@ import type { Identity } from "@/lib/identity";
 export const auth = { current: null as Identity | null };
 export const afterQueue: (() => unknown)[] = [];
 
-vi.mock("@/lib/identity", () => ({ getIdentity: async () => auth.current }));
+vi.mock("@/lib/identity", () => ({ getIdentity: async () => auth.current, DEMO_COOKIE: "dr_demo" }));
 vi.mock("next/server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/server")>()),
   connection: async () => undefined,

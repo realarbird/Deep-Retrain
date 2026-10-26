@@ -7,7 +7,9 @@ import { speak, speechRecognitionSupported, speechSynthesisSupported } from "@/c
 import { Button, Card, ErrorNote, Kicker, SectionTitle, Segmented, Switch, Tag } from "@/components/ui/primitives";
 import { api, formatRelative, MODE_INFO, zoneQuery, type DeviceInfo, type SettingsResponse, type SyncState } from "@/lib/client";
 import { CAP_MAX, CAP_MIN, DEFAULT_MODES, type DefaultMode, type SessionSize, type ThemeSetting } from "@/lib/settingsSchema";
+import { PrivacyPolicy } from "@/components/PrivacyPolicy";
 import { AiKeySettings } from "./AiKeySettings";
+import { DeleteAccount } from "./DeleteAccount";
 
 const DEVICE_ICON = { phone: Smartphone, tablet: Tablet, desktop: Monitor };
 
@@ -277,7 +279,13 @@ export function SettingsView({ isDemo, onKeyChange }: { isDemo: boolean; onKeyCh
             </li>
           </ul>
         </section>
+
+        {!isDemo && <DeleteAccount />}
       </aside>
+
+      <div className="lg:col-span-2">
+        <PrivacyPolicy />
+      </div>
     </div>
   );
 }
