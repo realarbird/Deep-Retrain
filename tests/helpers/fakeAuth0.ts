@@ -7,13 +7,22 @@ export function json(body: unknown, status = 200, headers: Record<string, string
 /** A fake Auth0 tenant: a token endpoint and users' app_metadata, with an optional failure switch. */
 export function fakeAuth0() {
   const users = new Map<string, Record<string, unknown>>();
-  const state = { failWith: null as null | { status: number; headers?: Record<string, string> } };
+  const state = {
+    failWith: null as null | { status: number; headers?: Record<string, string> },
+    /** Refuse user deletion only, as when the app lacks `delete:users`. */
+    denyDelete: false,
+  };
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (state.failWith) return json({ error: "nope" }, state.failWith.status, state.failWith.headers);
     if (url.endsWith("/oauth/token")) return json({ access_token: "mgmt-token", expires_in: 86_400 });
     const match = url.match(/\/api\/v2\/users\/([^?]+)/);
     if (match) {
       const id = decodeURIComponent(match[1]);
+      if (init?.method === "DELETE") {
+        if (state.denyDelete) return json({ error: "Insufficient scope" }, 403);
+        users.delete(id);
+        return new Response(null, { status: 204 });
+      }
       const meta = users.get(id) ?? {};
       users.set(id, meta);
       if (init?.method === "PATCH") {

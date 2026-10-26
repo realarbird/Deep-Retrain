@@ -101,3 +101,8 @@ export async function patchAppMetadata(userId: string, patch: Record<string, unk
     body: JSON.stringify({ app_metadata: patch }),
   });
 }
+
+/** Remove the user from the Auth0 tenant. Needs the `delete:users` scope. */
+export async function deleteUser(userId: string): Promise<void> {
+  await managementFetch(`/users/${encodeURIComponent(userId)}`, { method: "DELETE" });
+}

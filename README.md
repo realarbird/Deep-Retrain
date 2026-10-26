@@ -288,6 +288,8 @@ Without the index, retrieval falls back to in-app cosine similarity over the sam
 3. Set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and `AUTH0_SECRET` (`openssl rand -hex 32`).
 4. **Let the app write to learners' accounts** (AI keys, settings, devices and the progress summary). In the Auth0 dashboard, open **Applications → APIs → Auth0 Management API → Machine to Machine Applications**, authorize your application, and grant `read:users` and `update:users_app_metadata`. Make sure **Client Credentials** is enabled under the application's **Advanced Settings → Grant Types**. To use a separate machine-to-machine app instead, set `AUTH0_MANAGEMENT_CLIENT_ID` and `AUTH0_MANAGEMENT_CLIENT_SECRET`. If `AUTH0_DOMAIN` is a custom domain, set `AUTH0_MANAGEMENT_DOMAIN` to the tenant's `*.auth0.com` domain.
 
+For **Delete account** in Settings to remove the Auth0 user too, also grant `delete:users`. Without it, deleting an account still erases everything in MongoDB and clears the `deepretain_*` keys in Auth0, but the sign-in itself stays, and Settings asks the learner to email for its removal.
+
 Without step 4, sign-in still works; Settings shows "Not syncing" and keeps changes in MongoDB until access is granted.
 
 When the Auth0 variables are missing, the app runs in Demo Mode only and hides sign-in.

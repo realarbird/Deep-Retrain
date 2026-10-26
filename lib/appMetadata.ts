@@ -90,3 +90,8 @@ export async function writeAppMetadata(userId: string, patch: Record<string, unk
   }
   remember(userId, entry);
 }
+
+/** Drop a learner's cached copy, e.g. once their account is deleted. */
+export function forgetAppMetadata(userId: string): void {
+  cache.delete(userId);
+}

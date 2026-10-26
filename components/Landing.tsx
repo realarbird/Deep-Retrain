@@ -250,6 +250,9 @@ export function Landing({ auth0Enabled, demoEnabled }: { auth0Enabled: boolean; 
             Answers are marked by <TextLink href="https://ai.google.dev/gemma">Gemma 4</TextLink>, an open model. Sign-in by Auth0,
             data on MongoDB Atlas, hosted on Render.
           </p>
+          <p>
+            <TextLink href="/privacy.html">Privacy policy</TextLink>
+          </p>
         </div>
       </footer>
     </div>
