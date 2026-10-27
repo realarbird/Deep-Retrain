@@ -28,6 +28,7 @@ export const POST = withIdentity(async (identity, request: Request) => {
   const deck = await StudyDeck.create({
     auth0Id: identity.userId,
     title: deckTitle,
+    rawText,
     sourceType: "notes",
     cardCount: concepts.length,
     engine,

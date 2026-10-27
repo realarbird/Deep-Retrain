@@ -26,6 +26,9 @@ vi.mock("@/models/ReviewLog", async () => ({ ReviewLog: (await import("./helpers
 vi.mock("@/models/StudyDeck", async () => ({ StudyDeck: (await import("./helpers/fakeDb")).fakeDb.StudyDeck }));
 vi.mock("@/models/UserProfile", async () => ({ UserProfile: (await import("./helpers/fakeDb")).fakeDb.UserProfile }));
 
+vi.mock("@/models/MobileSyncReceipt", async () => ({ MobileSyncReceipt: (await import("./helpers/fakeDb")).fakeDb.MobileSyncReceipt }));
+vi.mock("@/models/MobileSyncArtifact", async () => ({ MobileSyncArtifact: (await import("./helpers/fakeDb")).fakeDb.MobileSyncArtifact }));
+
 export async function flushAfter(): Promise<void> {
   while (afterQueue.length) await afterQueue.shift()!();
 }

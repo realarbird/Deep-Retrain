@@ -164,6 +164,7 @@ export const TIER_LABEL: Record<Tier, string> = {
 };
 
 export const ENGINE_SHORT: Record<string, string> = {
+  "on-device": "On-device Gemma 4",
   ollama: "Gemma 4 (Ollama)",
   "google-ai-studio": "Gemma 4",
   heuristic: "Offline grader",

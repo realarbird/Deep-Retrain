@@ -18,6 +18,7 @@ const deviceSchema = new Schema(
 const userProfileSchema = new Schema(
   {
     auth0Id: { type: String, required: true, unique: true },
+    mobileSyncSequence: { type: Number, default: 0 },
     name: { type: String, default: "" },
     email: { type: String, default: null },
     isDemo: { type: Boolean, default: false },
