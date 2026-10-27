@@ -1,3 +1,5 @@
+import { MobileSyncReceipt } from "@/models/MobileSyncReceipt";
+import { MobileSyncArtifact } from "@/models/MobileSyncArtifact";
 import { capStatus, dailyCap, localDayBounds, type CapStatus } from "@/lib/pacer";
 import { ConceptCard } from "@/models/ConceptCard";
 import { ReviewLog } from "@/models/ReviewLog";
@@ -54,6 +56,8 @@ export function toReviewCardDTO(card: {
 
 export async function deleteAllUserData(userId: string): Promise<void> {
   await Promise.all([
+    MobileSyncReceipt.deleteMany({ auth0Id: userId }),
+    MobileSyncArtifact.deleteMany({ auth0Id: userId }),
     ConceptCard.deleteMany({ auth0Id: userId }),
     ReviewLog.deleteMany({ auth0Id: userId }),
     StudyDeck.deleteMany({ auth0Id: userId }),

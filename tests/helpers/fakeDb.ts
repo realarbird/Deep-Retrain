@@ -34,6 +34,9 @@ function clone<T>(value: T): T {
 class FakeQuery<T> implements PromiseLike<T> {
   private opts: { sort?: Record<string, 1 | -1>; limit?: number } = {};
   constructor(private run: (opts: { sort?: Record<string, 1 | -1>; limit?: number }) => T) {}
+  session() {
+    return this;
+  }
   select() {
     return this;
   }
@@ -93,7 +96,10 @@ export class FakeModel {
     return out;
   }
 
+  async init() { return this; }
+
   private checkUnique(doc: Doc, except?: Doc) {
+    if (this.docs.some(d => d !== except && d._id === doc._id)) throw Object.assign(new Error(`E11000 duplicate id in ${this.name}`), { code: 11000 });
     for (const fields of this.options.unique ?? []) {
       if (fields.some((f) => doc[f] === undefined || doc[f] === null)) continue;
       const clash = this.docs.find((d) => d !== except && fields.every((f) => d[f] === doc[f]));
@@ -117,14 +123,23 @@ export class FakeModel {
     return this.matching(filter).length;
   }
 
-  async create(input: Record<string, unknown>) {
+  async create(input: Record<string, unknown>[], options?: unknown): Promise<Doc[]>;
+  async create(input: Record<string, unknown>, options?: unknown): Promise<Doc>;
+  async create(input: Record<string, unknown> | Record<string, unknown>[], _options?: unknown): Promise<Doc | Doc[]> {
+    void _options;
+    if (Array.isArray(input)) {
+      const docs: Doc[] = [];
+      for (const entry of input) docs.push(await this.create(entry));
+      return docs;
+    }
     const doc = normalize({ _id: String(new mongoose.Types.ObjectId()), ...input }) as Doc;
     this.checkUnique(doc);
     this.docs.push(doc);
     return clone(doc);
   }
 
-  async insertMany(inputs: Record<string, unknown>[]) {
+  async insertMany(inputs: Record<string, unknown>[], _options?: unknown) {
+    void _options;
     const out = [];
     for (const input of inputs) out.push(await this.create(input));
     return out;
@@ -200,9 +215,11 @@ function createFakeDb() {
     ConceptCard: new FakeModel("ConceptCard"),
     ReviewLog: new FakeModel("ReviewLog", { unique: [["auth0Id", "attemptId"]] }),
     StudyDeck: new FakeModel("StudyDeck"),
+    MobileSyncReceipt: new FakeModel("MobileSyncReceipt", { unique: [["auth0Id", "operationId"]] }),
+    MobileSyncArtifact: new FakeModel("MobileSyncArtifact", { unique: [["auth0Id", "operationId", "kind"]] }),
     UserProfile: new FakeModel("UserProfile", { unique: [["auth0Id"]] }),
     reset() {
-      for (const m of [this.ConceptCard, this.ReviewLog, this.StudyDeck, this.UserProfile]) m.reset();
+      for (const m of [this.ConceptCard, this.ReviewLog, this.StudyDeck, this.UserProfile, this.MobileSyncReceipt, this.MobileSyncArtifact]) m.reset();
     },
   };
 }
