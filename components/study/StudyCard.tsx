@@ -168,7 +168,7 @@ export function StudyCard({ item, index, total, sessionId, askConfidence, speech
   useEffect(() => () => stopSpeaking(), []);
 
   const prompt = item.prompt;
-  const showTitle = prompt.kind !== "choice";
+  const showTitle = prompt.kind !== "choice" && (prompt.kind !== "cloze" || phase === "done");
   const busy = phase === "grading" || phase === "revealing";
   const last = index + 1 >= total;
   const clozeForm = `cloze-${item.id}`;
@@ -181,9 +181,10 @@ export function StudyCard({ item, index, total, sessionId, askConfidence, speech
     <>
       {/* Every line is one rule (28px) tall, so text stays on the card's lines. */}
       {showTitle && <Kicker>{item.conceptTitle}</Kicker>}
+      {item.fallbackReason === "no-key-term" && <p className="text-sm leading-7 text-ink-3">This card works better as a written question.</p>}
       {prompt.kind === "cloze" ? (
         <>
-          <p className="text-sm leading-7 text-ink-3">Fill in the missing word.</p>
+          <p className="text-sm leading-7 text-ink-3">Fill in the missing term or phrase.</p>
           {phase === "done" && response ? (
             <ClozeMarked text={prompt.text} given={clozeGiven} correct={response.result.correctAnswer} right={response.result.isAccurate} />
           ) : (

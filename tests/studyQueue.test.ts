@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { heuristicChoice, toStoredPractice, type ResolvedPractice } from "@/lib/practice";
+import { heuristicChoice, storedPractice, toStoredPractice, type ResolvedPractice } from "@/lib/practice";
 import { buildSession, orderDue, pickMode, revealedSinceReview, type QueueCard } from "@/lib/studyQueue";
 
 const NOW = new Date("2026-10-23T15:00:00.000Z");
@@ -87,7 +87,8 @@ describe("buildSession", () => {
   const base = { now: NOW, zone: ZONE, freeRecall: "write" as const, speech: false };
 
   it("never sends answers to the browser", () => {
-    const stored = toStoredPractice(deck[1], { cloze: { text: "Concept ____ moves protons", answers: ["SECRET-ANSWER"] } }, "ollama");
+    const stored = toStoredPractice(deck[1], { cloze: { text: "The concept moves ____ across a membrane.", answers: ["protons", "SECRET-ANSWER"] } }, "ollama");
+    expect(storedPractice({ ...deck[1], practice: stored })).not.toBeNull();
     const cards = [deck[0], { ...deck[1], practice: stored, leitnerBox: 2 }, deck[2]];
     for (const requested of ["auto", "choice", "truefalse", "cloze", "write", "flip", "teach"] as const) {
       const json = JSON.stringify(buildSession(cards, [{ _id: "d1", title: "Deck" }], siblings, { ...base, requested, limit: 10 }));
@@ -108,5 +109,16 @@ describe("buildSession", () => {
     expect(buildSession(deck, [], siblings, { ...base, requested: "write", limit: 2 })).toHaveLength(2);
     const many = Array.from({ length: 40 }, () => card());
     expect(buildSession(many, [], siblings, { ...base, requested: "write", limit: 100 })).toHaveLength(25);
+  });
+
+  it.each(["auto", "cloze"] as const)("keeps cards without reliable terms in %s as written questions", (requested) => {
+    const plain = card({ conceptTitle: "Overview", coreFact: "They fought together and worked hard.", expectedKeyPoints: ["They fought together"], leitnerBox: 2 });
+    const [item] = buildSession([plain], [], new Map(), { ...base, requested, limit: 1 });
+    expect(item).toMatchObject({ id: plain._id, mode: "write", prompt: { kind: "open", question: plain.currentQuestion }, fallbackReason: "no-key-term" });
+  });
+
+  it("doesn't show a fallback notice for an ordinary written question", () => {
+    const [item] = buildSession([deck[0]], [], siblings, { ...base, requested: "write", limit: 1 });
+    expect(item.fallbackReason).toBeUndefined();
   });
 });

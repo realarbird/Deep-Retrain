@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { defaultSettings } from "@/lib/settingsSchema";
 import { LOCAL_MODEL_ID, LOCAL_MODEL_SHA256 } from "@/lib/mobileSyncSchema";
 import { mobileRecord, type Doc } from "@/lib/mobileSyncRecords";
-import { cardSourceHash, statementId } from "@/lib/practice";
+import { cardSourceHash, PRACTICE_VERSION, statementId, toStoredPractice } from "@/lib/practice";
 import { STUDY_MODES } from "@/lib/leitner";
 import { GET, POST } from "@/app/api/mobile-sync/route";
 
@@ -95,7 +95,7 @@ describe("mobile account snapshots", () => {
 describe("transactional local operations", () => {
   it.each(STUDY_MODES)("preserves grading and mode ceilings for %s", async mode => {
     await fakeDb.ConceptCard.updateOne({ _id: CARD }, { $set: { leitnerBox: 4, practice: {
-      v: 1, engine: "curated", sourceHash: cardSourceHash(card() as never),
+      v: PRACTICE_VERSION, engine: "curated", sourceHash: cardSourceHash(card() as never),
       choice: { question: "What do mitochondria produce?", options: ["ATP", "DNA", "Glucose", "Starch"], answerIndex: 0 },
       cloze: { text: "Mitochondria produce ____.", answers: ["ATP"] },
       trueFalse: { statements: ["Mitochondria produce ATP.", "Mitochondria produce starch."], trueIndex: 0 },
@@ -113,7 +113,7 @@ describe("transactional local operations", () => {
     expect(card().reviewCount).toBe(1);
   });
   it("holds a fast correct answer at a recognition mode's ceiling and records wrong keyed answers", async () => {
-    await fakeDb.ConceptCard.updateOne({ _id: CARD }, { $set: { leitnerBox: 3, practice: { v: 1, engine: "curated", sourceHash: cardSourceHash(card() as never), choice: { question: "Produces ATP?", options: ["Mitochondria", "Nucleus", "Vacuole", "Wall"], answerIndex: 0 } } } });
+    await fakeDb.ConceptCard.updateOne({ _id: CARD }, { $set: { leitnerBox: 3, practice: { v: PRACTICE_VERSION, engine: "curated", sourceHash: cardSourceHash(card() as never), choice: { question: "Produces ATP?", options: ["Mitochondria", "Nucleus", "Vacuole", "Wall"], answerIndex: 0 } } } });
     const first = await review({}, { mode: "choice", practiceVersion: (await wire()).data.practiceVersion, answer: { selectedOption: "Mitochondria" }, score: 0 });
     expect((await push([first])).body.results[0].status).toBe("applied"); expect(card().leitnerBox).toBe(3); expect(fakeDb.ReviewLog.docs[0].boxCapped).toBe(true);
     const wrong = await review({ occurredAt: new Date(NOW.getTime() + 1000).toISOString() }, { mode: "choice", practiceVersion: (await wire()).data.practiceVersion, answer: { selectedOption: "Nucleus" }, score: 100 });
@@ -206,6 +206,24 @@ describe("transactional local operations", () => {
       expect((await push([next])).body.results[0].status).toBe("applied"); expect(card().leitnerBox).toBe(1);
     }
   });
+  it("keeps retired stored-key attempts for inspection instead of grading a new fallback", async () => {
+    card().practice = { ...toStoredPractice(card() as never, { cloze: { text: "Mitochondria produce ____.", answers: ["ATP"] } }, "curated"), v: 1 };
+    const op = await review({}, { mode: "cloze", practiceVersion: `s:${cardSourceHash(card() as never)}`, answer: { answer: "ATP" } });
+    const result = (await push([op])).body.results[0];
+    expect(result.status).toBe("conflict");
+    expect(result.message).toContain("practice item changed");
+    expect(card().reviewCount).toBe(0);
+    expect(fakeDb.ReviewLog.docs).toHaveLength(0);
+    expect(fakeDb.MobileSyncArtifact.docs).toHaveLength(1);
+  });
+
+  it("rejects ADP as an ATP typo in a local keyed answer", async () => {
+    card().practice = toStoredPractice(card() as never, { cloze: { text: "Mitochondria produce ____.", answers: ["ATP"] } }, "curated");
+    const op = await review({}, { mode: "cloze", practiceVersion: (await wire()).data.practiceVersion, answer: { answer: "ADP" }, score: 100 });
+    expect((await push([op])).body.results[0].status).toBe("applied");
+    expect(fakeDb.ReviewLog.docs[0].score).toBe(0);
+  });
+
   it("supports causal baseOperationId chains without trusting a locally invented revision", async () => {
     const first = await review();
     const second = await review({ id: randomUUID(), occurredAt: new Date(NOW.getTime() + 1000).toISOString(), baseRevision: "local-projection", baseOperationId: first.id });

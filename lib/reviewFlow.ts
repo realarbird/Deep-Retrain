@@ -19,7 +19,7 @@ export interface KeyGrade {
   score: number;
   correct: boolean;
   feedback: string;
-  /** Shown after answering: the right option, the missing word, or whether the statement was true. */
+  /** Shown after answering: the right option, the missing term, or whether the statement was true. */
   correctAnswer: string;
   /** What the learner gave, as stored in the review log. */
   given: string;
@@ -60,7 +60,7 @@ export function gradeClozeAttempt(cloze: ClozePractice, given: string): KeyGrade
         : match === "typo"
           ? `Close enough. It's spelled “${expected}”.`
           : given.trim()
-            ? `The missing word was “${expected}”.`
+            ? `The missing term was “${expected}”.`
             : `It was “${expected}”.`;
   return { score, correct: match !== "wrong", feedback, correctAnswer: expected, given };
 }

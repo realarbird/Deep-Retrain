@@ -9,10 +9,11 @@
  */
 import { z } from "zod";
 import { plainProse } from "@/lib/ai/prose";
-import { STOPWORDS, stem, tokenize } from "@/lib/ai/heuristic";
+import { STOPWORDS, stem } from "@/lib/ai/heuristic";
+import { isKeyTerm, isTermPhrase, keyTermCandidates, keyTermPattern } from "@/lib/keyTerms";
 import type { DifficultyTier } from "@/lib/leitner";
 
-export const PRACTICE_VERSION = 1;
+export const PRACTICE_VERSION = 2;
 export const BLANK = "____";
 
 export interface PracticeCard {
@@ -77,9 +78,9 @@ export function shortHash(text: string): string {
   return fnv(text).toString(16).padStart(8, "0");
 }
 
-/** Changes whenever the card's title, fact or key points change. */
+/** Changes when card content or the practice algorithm changes. */
 export function cardSourceHash(card: Pick<PracticeCard, "conceptTitle" | "coreFact" | "expectedKeyPoints">): string {
-  const text = [card.conceptTitle, card.coreFact, ...(card.expectedKeyPoints ?? [])].join("␟");
+  const text = [`practice-v${PRACTICE_VERSION}`, card.conceptTitle, card.coreFact, ...(card.expectedKeyPoints ?? [])].join("␟");
   return shortHash(text) + fnv(text, 0x9747b28c).toString(16).padStart(8, "0");
 }
 
@@ -87,7 +88,10 @@ export function cardSourceHash(card: Pick<PracticeCard, "conceptTitle" | "coreFa
 export function storedPractice(card: PracticeCard): StoredPractice | null {
   const parsed = storedPracticeSchema.safeParse(card.practice);
   if (!parsed.success) return null;
-  return parsed.data.sourceHash === cardSourceHash(card) ? parsed.data : null;
+  if (parsed.data.sourceHash !== cardSourceHash(card)) return null;
+  const { cloze, engine } = parsed.data;
+  if (cloze && (!isKeyTerm(cloze.answers[0], card, engine === "curated") || !cloze.answers.every((answer) => isTermPhrase(answer, engine === "curated")) || !validCloze(cloze.text, cloze.answers))) return null;
+  return parsed.data;
 }
 
 /** Sent with each study item and checked when grading, so an edited card is caught. */
@@ -151,33 +155,21 @@ export function heuristicChoice(card: PracticeCard, siblings: Sibling[]): Choice
 
 // ── Fill the gap ────────────────────────────────────────────────────────
 
-const WORD = /[A-Za-z][A-Za-z0-9'-]*[A-Za-z0-9]|[A-Za-z]/g;
-
-/** The most telling word in the fact: one the key points also use, not part of the title. */
+/** Only confidently identified terms are eligible for the offline fallback. */
 export function pickClozeTerm(card: Pick<PracticeCard, "conceptTitle" | "coreFact" | "expectedKeyPoints">): string | null {
-  const titleStems = new Set(tokenize(card.conceptTitle));
-  const keyStems = new Set(card.expectedKeyPoints.flatMap((k) => tokenize(k)));
-  let best: { word: string; score: number } | null = null;
-  for (const match of card.coreFact.matchAll(WORD)) {
-    const word = match[0];
-    const lower = word.toLowerCase();
-    if (word.length < 4 || STOPWORDS.has(lower)) continue;
-    const s = stem(lower);
-    if (titleStems.has(s)) continue;
-    const sentenceStart = match.index === 0 || /[.!?]\s*$/.test(card.coreFact.slice(0, match.index));
-    const score = (keyStems.has(s) ? 3 : 0) + (/^[A-Z]/.test(word) && !sentenceStart ? 1 : 0) + Math.min(word.length, 12) / 10;
-    if (!best || score > best.score) best = { word, score };
-  }
-  return best?.word ?? null;
+  return keyTermCandidates(card)[0] ?? null;
 }
 
 export function heuristicCloze(card: PracticeCard, preferredTerms: string[] = []): ClozePractice | null {
   const term =
-    preferredTerms.find((t) => termPattern(t, "i").test(card.coreFact)) ?? pickClozeTerm(card);
+    preferredTerms.find((t) => isKeyTerm(t, card, true) && [...card.coreFact.matchAll(keyTermPattern(t))].length === 1) ?? pickClozeTerm(card);
   if (!term) return null;
-  const text = card.coreFact.replace(termPattern(term), BLANK);
-  if (!text.includes(BLANK)) return null;
-  return { text, answers: [term] };
+  const text = card.coreFact.replace(keyTermPattern(term), BLANK);
+  return validCloze(text, [term]) ? { text, answers: [term] } : null;
+}
+
+function validCloze(text: string, answers: string[]): boolean {
+  return text.split(BLANK).length === 2 && Boolean(text.replace(BLANK, "").trim()) && answers.every((answer) => !keyTermPattern(answer, "iu").test(text));
 }
 
 /** Lower-case, accents and punctuation stripped, leading article dropped. */
@@ -186,7 +178,7 @@ export function normalizeAnswer(text: string): string {
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
     .replace(/^(?:the|a|an)\s+/, "");
 }
@@ -207,15 +199,21 @@ function levenshtein(a: string, b: string): number {
 
 export type TermMatch = "exact" | "stem" | "typo" | "wrong";
 
-/** Plurals and word endings pass, small typos pass, numbers must match exactly. */
+/** Ordinary words allow small typos; acronyms, numbers and symbols must be exact. */
 export function fuzzyTermMatch(given: string, expected: string): TermMatch {
   const g = normalizeAnswer(given);
   const e = normalizeAnswer(expected);
   if (!g || !e) return "wrong";
+  // A hyphen used to join words is ordinary punctuation, but charges and formula operators carry meaning.
+  const formulaSymbols = (s: string) => s.normalize("NFKC").replace(/−/g, "-").replace(/(?<=\p{L})-(?=\p{L})/gu, "").match(/[+\-=^/]/g)?.join("") ?? "";
+  if (formulaSymbols(given) !== formulaSymbols(expected)) return "wrong";
   if (g === e) return "exact";
   if (/\d/.test(e) || /\d/.test(g)) return "wrong";
   const gt = g.split(" ");
   const et = e.split(" ");
+  const protectedTokens = expected.match(/\b[A-Z]{2,}\b/g) ?? [];
+  if (protectedTokens.some((token) => !gt.includes(token.toLowerCase()))) return "wrong";
+  if (e.length <= 3 || formulaSymbols(expected)) return "wrong";
   if (gt.length === et.length && gt.every((t, i) => stem(t) === stem(et[i]))) return "stem";
   return levenshtein(g, e) <= (e.length <= 5 ? 1 : 2) ? "typo" : "wrong";
 }
@@ -354,10 +352,16 @@ export function normalizePracticeItem(raw: RawPracticeItem, card: PracticeCard):
 
   const answer = clean(raw.cloze?.answer, 80);
   let sentence = clean(raw.cloze?.sentence, 900).replace(/_{2,}/g, BLANK);
-  if (answer && sentence && !sentence.includes(BLANK)) sentence = sentence.replace(termPattern(answer, "i"), BLANK);
-  if (answer && sentence.split(BLANK).length === 2) {
-    const alternatives = (raw.cloze?.alternatives ?? []).map((a) => clean(a, 80)).filter(Boolean);
-    out.cloze = { text: sentence, answers: [...new Set([answer, ...alternatives])].slice(0, 5) };
+  if (answer && sentence && !sentence.includes(BLANK)) sentence = sentence.replace(keyTermPattern(answer, "iu"), BLANK);
+  if (isKeyTerm(answer, card) && validCloze(sentence, [answer])) {
+    const seen = new Set([normalizeAnswer(answer)]);
+    const alternatives = (raw.cloze?.alternatives ?? []).map((a) => clean(a, 80)).filter((a) => {
+      const key = normalizeAnswer(a);
+      if (!isTermPhrase(a) || seen.has(key) || keyTermPattern(a, "iu").test(sentence)) return false;
+      seen.add(key);
+      return true;
+    });
+    out.cloze = { text: sentence, answers: [answer, ...alternatives].slice(0, 5) };
   }
 
   const t = clean(raw.trueFalse?.trueStatement, 700);

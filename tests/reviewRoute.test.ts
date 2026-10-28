@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { afterQueue, auth, demo, DEVICE_ID, IPHONE_UA } from "./routeSetup";
 import { fakeDb } from "./helpers/fakeDb";
 import { NextRequest } from "next/server";
-import { heuristicCloze } from "@/lib/practice";
+import { cardSourceHash, heuristicCloze, toStoredPractice } from "@/lib/practice";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- route responses are loose JSON in these tests
 type Loose = any;
@@ -149,6 +149,31 @@ describe("POST /api/review", () => {
     expect(r.body.result.score).toBe(85);
     expect(r.body.result.outcome).toBe("promote");
     expect(card(cardId(0)).leitnerBox).toBe(3);
+  });
+
+  it("checks scientific acronyms exactly rather than accepting a different term as a typo", async () => {
+    const { cardId } = seedDeck({ box: 2 });
+    const first = card(cardId(0));
+    first.practice = toStoredPractice(first, { cloze: { text: "Glycolysis nets two ____.", answers: ["ATP"] } }, "curated");
+    const s = await study("mode=cloze&size=5");
+    const item = s.body.items.find((i: Loose) => i.id === first._id);
+    const r = await review({ mode: "cloze", cardId: item.id, answer: "ADP", practiceVersion: item.practiceVersion, latencyMs: 2_000 });
+    expect(r.status).toBe(200);
+    expect(r.body.result).toMatchObject({ score: 0, correctAnswer: "ATP", outcome: "reset" });
+  });
+
+  it("retires legacy stored practice and refuses to grade it as the replacement question", async () => {
+    const { cardId } = seedDeck({ box: 2 });
+    const first = card(cardId(0));
+    first.practice = { ...toStoredPractice(first, { cloze: { text: "They ____.", answers: ["fought"] } }, "ollama"), v: 1 };
+    const s = await study("mode=cloze&size=5");
+    const item = s.body.items.find((i: Loose) => i.id === first._id);
+    expect(item.practiceVersion).toMatch(/^h:/);
+    expect(item.prompt.text).not.toContain("fought");
+    const r = await review({ mode: "cloze", cardId: item.id, answer: "fought", practiceVersion: `s:${cardSourceHash(first)}`, latencyMs: 2_000 });
+    expect(r.status).toBe(409);
+    expect(r.body.stale).toBe(true);
+    expect(logs()).toHaveLength(0);
   });
 
   it("needs a reveal before Flip, and only allows rating afterwards", async () => {

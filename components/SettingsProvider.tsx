@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { api, tzOffset, zoneQuery, type DeviceInfo, type Settings, type SettingsResponse, type SyncState } from "@/lib/client";
 import type { SettingsPatch } from "@/lib/settingsSchema";
 import { applyDisplaySettings } from "@/lib/themeScript";
+import { SettingsSaveQueue } from "@/lib/settingsSaveQueue";
 
 interface AccountView {
   settings: Settings;
@@ -17,7 +18,9 @@ interface AccountView {
 interface SettingsContextValue extends AccountView {
   update: (patch: SettingsPatch) => void;
   saving: boolean;
+  dirty: boolean;
   error: string | null;
+  retry: () => void;
   replace: (next: Partial<AccountView>) => void;
 }
 
@@ -26,10 +29,6 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 const SAVE_DELAY_MS = 800;
 const REFETCH_AFTER_MS = 60_000;
 const OLD_TIMER_KEY = "deepretain:hide-timer";
-
-function mergePatch(a: SettingsPatch, b: SettingsPatch): SettingsPatch {
-  return { ...a, ...b, ...(a.speech || b.speech ? { speech: { ...a.speech, ...b.speech } } : {}) };
-}
 
 /**
  * Settings follow the account. Changes show at once, are saved after a short
@@ -40,8 +39,9 @@ function mergePatch(a: SettingsPatch, b: SettingsPatch): SettingsPatch {
 export function SettingsProvider({ initial, children }: { initial: AccountView; children: ReactNode }) {
   const [view, setView] = useState<AccountView>(initial);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pending = useRef<SettingsPatch>({});
+  const queue = useRef(new SettingsSaveQueue());
   const timer = useRef<number | null>(null);
   const lastFetch = useRef(0);
 
@@ -60,28 +60,35 @@ export function SettingsProvider({ initial, children }: { initial: AccountView; 
     });
   }, [view.settings.theme, view.settings.reduceMotion, view.settings.handwriting]);
 
-  const flush = useCallback(async () => {
+  const flush = useCallback(async function save() {
+    if (timer.current) window.clearTimeout(timer.current);
     timer.current = null;
-    const patch = pending.current;
-    pending.current = {};
-    if (!Object.keys(patch).length) return;
+    const patch = queue.current.begin();
+    if (!patch) return;
     setSaving(true);
+    setError(null);
+    let succeeded = false;
     try {
       const r = await api<SettingsResponse>("/api/settings", { method: "PATCH", json: { settings: patch, tzOffsetMinutes: tzOffset() } });
       lastFetch.current = Date.now();
       // Keep anything typed while this request was in flight.
+      const settings = queue.current.overlay(r.settings);
       setView((v) => ({
         ...v,
-        settings: Object.keys(pending.current).length ? { ...r.settings, ...pending.current, speech: { ...r.settings.speech, ...pending.current.speech } } : r.settings,
+        settings,
         sync: r.sync,
         devices: r.devices,
         capToday: r.capToday,
       }));
+      succeeded = true;
       setError(null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
+      const again = queue.current.finish(succeeded);
       setSaving(false);
+      setDirty(queue.current.dirty);
+      if (again) void save();
     }
   }, []);
 
@@ -91,7 +98,8 @@ export function SettingsProvider({ initial, children }: { initial: AccountView; 
         ...v,
         settings: { ...v.settings, ...patch, speech: { ...v.settings.speech, ...(patch.speech ?? {}) } } as Settings,
       }));
-      pending.current = mergePatch(pending.current, patch);
+      queue.current.enqueue(patch);
+      setDirty(true);
       if (timer.current) window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => void flush(), SAVE_DELAY_MS);
     },
@@ -99,7 +107,7 @@ export function SettingsProvider({ initial, children }: { initial: AccountView; 
   );
 
   const replace = useCallback((next: Partial<AccountView>) => {
-    if (Object.keys(pending.current).length) return;
+    if (queue.current.dirty) return;
     setView((v) => ({ ...v, ...next }));
   }, []);
 
@@ -111,8 +119,15 @@ export function SettingsProvider({ initial, children }: { initial: AccountView; 
         void flush();
       }
     };
+    const onOnline = () => {
+      if (queue.current.dirty) void flush();
+    };
     document.addEventListener("visibilitychange", onHide);
-    return () => document.removeEventListener("visibilitychange", onHide);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("online", onOnline);
+    };
   }, [flush]);
 
   // Pick up changes made on another device when you come back to this tab.
@@ -146,7 +161,7 @@ export function SettingsProvider({ initial, children }: { initial: AccountView; 
     return () => window.clearTimeout(t);
   }, [initial.settings.updatedAt, update]);
 
-  return <SettingsContext.Provider value={{ ...view, update, saving, error, replace }}>{children}</SettingsContext.Provider>;
+  return <SettingsContext.Provider value={{ ...view, update, saving, dirty, error, retry: () => void flush(), replace }}>{children}</SettingsContext.Provider>;
 }
 
 export function useSettings(): SettingsContextValue {

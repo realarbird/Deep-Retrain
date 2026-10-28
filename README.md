@@ -58,13 +58,15 @@ Cramming feels productive and fades within days. DeepRetain asks for about **15 
 | **Multiple choice** | Pick one of four (keys 1–4) | answer key | 8 s | box 3 |
 | **True or false** | One statement, two buttons (keys T and F) | answer key | 6 s | box 3 |
 | **Flip** | Think of the answer, flip the card (Space), rate yourself 1–4 | your rating | 8 s | box 4 |
-| **Fill the gap** | Type the one missing word. Plurals, stems and small typos are fine; numbers must be exact | answer key | 10 s | box 4 |
+| **Fill the gap** | Recall a key term or phrase. Longer words allow plurals and small typos; acronyms, numbers and symbols must match exactly | answer key | 10 s | box 4 |
 | **Write** | Answer in your own words (Ctrl+Enter) | Gemma | 12 s | box 5 |
 | **Say it** | Answer out loud; your browser turns it into text you can edit before sending | Gemma | 15 s | box 5 |
 | **Teach it back** | Explain it to someone who's never heard of it | Gemma, with a teaching rubric | 90 s | box 5 |
 | **Listen** | Hands-free: it reads the question, waits, then reads the answer. Rating is optional; skip it and nothing is logged | your rating | | box 4 |
 
 After a session you can play a **cool-down match**: five titles against five facts, using only cards you just answered. It isn't marked or logged.
+
+Fill-the-gap questions use source-backed key terms rather than arbitrary words. Gemma selects a meaningful term; local checks reject ordinary verbs, unsupported answers and questions that reveal the answer. Without AI, curated terms, explicit term lists, concept titles and supported names, dates or acronyms provide a conservative fallback. If none fits, the card uses its normal written question. Concept titles stay hidden until a gap is answered.
 
 Every marked mode counts toward the daily limit, moves the card and logs the review. Sessions take 5, 10, 15 or everything left today, optionally from one deck. Overdue cards come first, then decks with an exam in the next week, then the decks take turns.
 

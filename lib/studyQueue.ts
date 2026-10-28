@@ -55,6 +55,7 @@ export interface StudyItem {
   mode: StudyMode;
   prompt: StudyPrompt;
   practiceVersion: string;
+  fallbackReason?: "no-key-term";
 }
 
 /** The answer was shown (Flip or Listen) but never rated: the card can only be rated now. */
@@ -191,6 +192,10 @@ export function buildSession(
       const siblings = (siblingsByDeck.get(String(card.deckId)) ?? []).filter((s) => s.conceptTitle !== card.conceptTitle);
       const practice = resolvePractice(card, siblings);
       const mode = pickMode(requested, card, { freeRecall, speech, practice });
-      return toStudyItem(card, mode, practice, titles.get(String(card.deckId)) ?? "");
+      const item = toStudyItem(card, mode, practice, titles.get(String(card.deckId)) ?? "");
+      if (mode === "write" && !practice.cloze && (requested === "cloze" || (requested === "auto" && card.leitnerBox === 2))) {
+        item.fallbackReason = "no-key-term";
+      }
+      return item;
     });
 }

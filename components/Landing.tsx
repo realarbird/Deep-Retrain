@@ -22,7 +22,7 @@ const WAYS = [
   {
     when: "A word or a sentence",
     modes: [
-      ["Fill the gap", "type the one missing word"],
+      ["Fill the gap", "recall a key term or phrase"],
       ["Write", "answer in your own words"],
       ["Say it", "answer out loud"],
     ],

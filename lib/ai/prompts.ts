@@ -125,7 +125,7 @@ ${answer.trim() || "(no answer)"}
 
 export const PRACTICE_SYSTEM = `You write practice items for DeepRetain, a spaced-repetition app. For each concept card, write:
 - choice: a multiple-choice question about the concept with one correct answer and three distractors. Distractors are plausible, about the same length and style as the correct answer, and clearly wrong according to the card. Never use "all of the above" or "none of the above". The question must not contain the answer.
-- cloze: one sentence restating the core fact with exactly one key term replaced by "____". "answer" is the missing term (1 to 4 words); "alternatives" are other acceptable spellings or synonyms (may be empty).
+- cloze: test recall of a meaningful key term: a technical concept, named person or place, date, acronym, or essential quantity supported by the card. Choose the term first, then restate the core fact with exactly that one term replaced by "____". "answer" is the missing term (1 to 4 words); "alternatives" are equivalent spellings or synonyms (may be empty). Never blank ordinary verbs such as "fought", "happened", "uses", or "makes", pronouns, filler words, or a fragment of a longer term. Keep enough context to make the answer clear, and never repeat the answer elsewhere in the sentence. If no suitable key term exists, leave sentence and answer empty and alternatives empty.
 - trueFalse: one true statement and one false statement about the concept. The false one changes a single key fact so it is clearly wrong, not a trick of wording.
 - application: ONE question that ${TIER_INSTRUCTIONS.application}. End with "?".
 - synthesis: ONE question that ${TIER_INSTRUCTIONS.synthesis}. End with "?".

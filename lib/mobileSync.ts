@@ -121,6 +121,7 @@ async function applyOperation(owner: string, op: MobileOperation, settings: Acco
         if (!version || version[2] !== cardSourceHash(card as unknown as PracticeCard)) return problem("The practice item changed. The offline answer was kept for inspection.");
         const siblings = await ConceptCard.find({ auth0Id: owner, deckId: String(card.deckId), _id: { $ne: String(card._id) } }).sort({ _id: 1 }).session(session).lean();
         const practice = resolvePractice(card as unknown as PracticeCard, siblings as Sibling[], { useStored: version[1] === "s" });
+        if (version[1] === "s" && practice.source !== "stored") return problem("The practice item changed. The offline answer was kept for inspection.");
         let grade: KeyGrade | null = null;
         if (p.mode === "choice" && practice.choice && p.answer.selectedOption !== undefined) { grade = gradeChoiceAttempt(practice.choice, p.answer.selectedOption); question = practice.choice.question; }
         if (p.mode === "cloze" && practice.cloze && p.answer.answer !== undefined) { grade = gradeClozeAttempt(practice.cloze, p.answer.answer); question = practice.cloze.text; }

@@ -23,7 +23,7 @@ function syncSentence(sync: SyncState, isDemo: boolean): string {
 }
 
 export function SettingsView({ isDemo, onKeyChange }: { isDemo: boolean; onKeyChange: () => Promise<void> }) {
-  const { settings, update, sync, devices, thisDevice, capToday, saving, error, replace } = useSettings();
+  const { settings, update, sync, devices, thisDevice, capToday, saving, dirty, error, retry, replace } = useSettings();
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const canHear = speechRecognitionSupported();
@@ -57,10 +57,11 @@ export function SettingsView({ isDemo, onKeyChange }: { isDemo: boolean; onKeyCh
       <div className="space-y-8">
         <div>
           <h1 className="font-serif text-3xl font-medium text-ink">Settings</h1>
-          <p className="mt-1 text-sm text-ink-3">{saving ? "Saving…" : "Changes save on their own."}</p>
+          <p role="status" className="mt-1 text-sm text-ink-3">{saving ? "Saving…" : dirty ? "Unsaved changes." : "Changes save on their own."}</p>
           {error && (
             <div className="mt-2">
               <ErrorNote>{error}</ErrorNote>
+              <Button variant="secondary" className="mt-2 text-xs" onClick={retry} disabled={saving}>Retry save</Button>
             </div>
           )}
         </div>

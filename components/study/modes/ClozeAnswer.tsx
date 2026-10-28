@@ -55,12 +55,13 @@ export function ClozeSentence({
             onChange(e.target.value.slice(0, 120));
           }}
           disabled={busy}
-          aria-label="The missing word"
+          aria-label="The missing term or phrase"
+          enterKeyHint="done"
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          className="mx-1 inline-block h-6 border-0 border-b-2 border-dashed border-ink-3 bg-transparent px-1 py-0 text-center align-baseline font-sans text-base leading-6 text-accent-text focus:border-solid focus:border-accent focus:outline-none"
-          style={{ width: `${Math.max(8, value.length + 2)}ch` }}
+          className="mx-1 inline-block h-7 max-w-full border-0 border-b-2 border-dashed border-ink-3 bg-transparent px-1 py-0 text-center align-baseline font-sans text-base leading-7 text-accent-text focus:border-solid focus:border-accent focus:outline-none"
+          style={{ width: `${Math.min(28, Math.max(12, value.length + 2))}ch` }}
         />
         {after}
       </p>
