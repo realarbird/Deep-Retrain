@@ -219,11 +219,18 @@ export async function evaluateAndFollowUp(
     related = [],
     now = new Date(),
     mode = "write",
+    latencyThresholdMs,
     ...ai
-  }: AiOptions & { related?: RelatedConcept[]; now?: Date; mode?: ModelGradedMode } = {},
+  }: AiOptions & {
+    related?: RelatedConcept[];
+    now?: Date;
+    mode?: ModelGradedMode;
+    /** This card's time (lib/answerTime.ts). Left out, the mode's base time applies. */
+    latencyThresholdMs?: number | null;
+  } = {},
 ): Promise<EvaluationResult> {
   const targetTier = nextTier(card.leitnerBox);
-  const threshold = MODE_RULES[mode].latencyMs;
+  const threshold = latencyThresholdMs === undefined ? MODE_RULES[mode].latencyMs : latencyThresholdMs;
   const wasFast = threshold === null || latencyMs < threshold;
   const { data, engine } = await runJsonTask(
     {
@@ -244,7 +251,7 @@ export async function evaluateAndFollowUp(
   );
 
   const score = Math.round(Math.min(100, Math.max(0, Number.isFinite(data.score) ? data.score : 0)));
-  const decision = decideOutcome({ score, latencyMs, box: card.leitnerBox, now, mode });
+  const decision = decideOutcome({ score, latencyMs, box: card.leitnerBox, now, mode, latencyThresholdMs: threshold });
   const fallback = heuristicEvaluate(card, userAnswer, related, targetTier);
 
   return {

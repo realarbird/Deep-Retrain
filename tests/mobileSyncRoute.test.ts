@@ -7,7 +7,7 @@ import { defaultSettings } from "@/lib/settingsSchema";
 import { LOCAL_MODEL_ID, LOCAL_MODEL_SHA256 } from "@/lib/mobileSyncSchema";
 import { mobileRecord, type Doc } from "@/lib/mobileSyncRecords";
 import { cardSourceHash, PRACTICE_VERSION, statementId, toStoredPractice } from "@/lib/practice";
-import { STUDY_MODES } from "@/lib/leitner";
+import { MODE_RULES, STUDY_MODES } from "@/lib/leitner";
 import { GET, POST } from "@/app/api/mobile-sync/route";
 
 vi.mock("@/lib/account", async importOriginal => ({
@@ -90,6 +90,10 @@ describe("mobile account snapshots", () => {
     expect((await get("cards", "&after=no")).status).toBe(400);
     expect((await get("cards", "&limit=201")).status).toBe(400);
   });
+  it("includes the recorded time allowance when downloading web review history", async () => {
+    await fakeDb.ReviewLog.create({ _id: "9".repeat(24), auth0Id: alice.userId, cardId: CARD, responseLatencyMs: 20000, latencyThresholdMs: 34000, mode: "write" });
+    expect((await get("reviews")).body.records[0].data).toMatchObject({ responseLatencyMs: 20000, latencyThresholdMs: 34000 });
+  });
 });
 
 describe("transactional local operations", () => {
@@ -108,9 +112,17 @@ describe("transactional local operations", () => {
     const answer = mode === "choice" ? { selectedOption: "ATP" } : mode === "cloze" ? { answer: "ATP" } : mode === "truefalse" ? { statementId: statementId("Mitochondria produce ATP."), value: true } : mode === "flip" || mode === "listen" ? { selfRating: "easy" } : { answer: "Mitochondria produce ATP in cells." };
     const result = (await push([await review({}, { mode, practiceVersion: data.practiceVersion, answer })])).body.results[0];
     expect(result.status).toBe("applied");
-    expect(fakeDb.ReviewLog.docs[0]).toMatchObject({ mode, engine: "on-device", outcome: "promote" });
+    expect(fakeDb.ReviewLog.docs[0]).toMatchObject({ mode, engine: "on-device", outcome: "promote", latencyThresholdMs: MODE_RULES[mode].latencyMs });
+    expect(result.records.find((r: Json) => r.collection === "reviews").data.latencyThresholdMs).toBe(MODE_RULES[mode].latencyMs);
     expect(card().leitnerBox).toBe(["write", "voice", "teach"].includes(mode) ? 5 : 4);
     expect(card().reviewCount).toBe(1);
+  });
+  it("keeps protocol v1 offline reviews on the mode's base time", async () => {
+    // Queued native attempts predate per-card timing and must retain their original rules.
+    await fakeDb.ConceptCard.updateOne({ _id: CARD }, { $set: { expectedKeyPoints: ["a long answer with many details that would receive more time on the web"] } });
+    const result = (await push([await review({}, { latencyMs: MODE_RULES.write.latencyMs })])).body.results[0];
+    expect(result.status).toBe("applied");
+    expect(fakeDb.ReviewLog.docs[0]).toMatchObject({ outcome: "hesitation", latencyThresholdMs: 12000 });
   });
   it("holds a fast correct answer at a recognition mode's ceiling and records wrong keyed answers", async () => {
     await fakeDb.ConceptCard.updateOne({ _id: CARD }, { $set: { leitnerBox: 3, practice: { v: PRACTICE_VERSION, engine: "curated", sourceHash: cardSourceHash(card() as never), choice: { question: "Produces ATP?", options: ["Mitochondria", "Nucleus", "Vacuole", "Wall"], answerIndex: 0 } } } });

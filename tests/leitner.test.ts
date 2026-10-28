@@ -137,6 +137,15 @@ describe("study modes", () => {
     expect(decideOutcome({ score: 20, latencyMs: 1_000, box: 3, now: NOW, mode: "flip" }).newBox).toBe(1);
   });
 
+  it("uses the card's own time when it has one", () => {
+    expect(decideOutcome({ score: 90, latencyMs: 20_000, box: 2, now: NOW }).outcome).toBe("hesitation");
+    const r = decideOutcome({ score: 90, latencyMs: 20_000, box: 2, now: NOW, latencyThresholdMs: 31_000 });
+    expect(r).toMatchObject({ outcome: "promote", newBox: 3, isFast: true, latencyThresholdMs: 31_000 });
+    expect(decideOutcome({ score: 90, latencyMs: 31_000, box: 2, now: NOW, latencyThresholdMs: 31_000 }).outcome).toBe("hesitation");
+    // Null means no limit, the way Listen works.
+    expect(decideOutcome({ score: 90, latencyMs: 200_000, box: 1, now: NOW, latencyThresholdMs: null }).outcome).toBe("promote");
+  });
+
   it("defaults to write so existing callers keep their behavior", () => {
     const r = decideOutcome({ score: 92, latencyMs: 6_000, box: 4, now: NOW });
     expect(r).toMatchObject({ outcome: "promote", newBox: 5, boxCapped: false, latencyThresholdMs: 12_000 });

@@ -8,7 +8,7 @@ import { ConceptCard } from "@/models/ConceptCard";
 import { ReviewLog } from "@/models/ReviewLog";
 import { StudyDeck } from "@/models/StudyDeck";
 
-const LOG_FIELDS = "reviewedAt score responseLatencyMs outcome boxBefore mode confidence thinkMs device capLimit simulated cardId deckId";
+const LOG_FIELDS = "reviewedAt score responseLatencyMs latencyThresholdMs outcome boxBefore mode confidence thinkMs device capLimit simulated cardId deckId";
 const CARD_FIELDS = "deckId conceptTitle leitnerBox nextReviewDate lastReviewedAt reviewCount lapses lastScore latencyHistory createdAt suspended";
 
 /** Everything on the Stats tab, for one range (30, 90 or 365 days) and optionally one deck. */

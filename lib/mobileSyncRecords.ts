@@ -60,7 +60,7 @@ export async function mobileRecord(collection: MobileCollection, doc: Doc, owner
     data = { ...data, ...pick(doc, ["title", "sourceType", "sampleKey", "cardCount", "engine", "examDate", "examLabel", "rawText", "modelId", "modelSha256", "createdAt", "updatedAt"]) };
     data.rawText ??= "";
   } else if (collection === "reviews") {
-    data = { ...data, ...pick(doc, ["cardId", "deckId", "conceptTitle", "question", "userAnswer", "rawAnswer", "score", "responseLatencyMs", "outcome", "boxBefore", "boxAfter", "difficultyTier", "feedback", "coveredKeyPoints", "missingKeyPoints", "followUpQuestion", "followUpAnswer", "followUpReply", "analogy", "retrievedConceptIds", "engine", "modelId", "modelSha256", "operationId", "simulated", "reviewedAt", "mode", "selfRating", "confidence", "thinkMs", "sessionId", "attemptId", "device", "capLimit", "boxCapped", "examAdjusted", "createdAt", "updatedAt"]) };
+    data = { ...data, ...pick(doc, ["cardId", "deckId", "conceptTitle", "question", "userAnswer", "rawAnswer", "score", "responseLatencyMs", "latencyThresholdMs", "outcome", "boxBefore", "boxAfter", "difficultyTier", "feedback", "coveredKeyPoints", "missingKeyPoints", "followUpQuestion", "followUpAnswer", "followUpReply", "analogy", "retrievedConceptIds", "engine", "modelId", "modelSha256", "operationId", "simulated", "reviewedAt", "mode", "selfRating", "confidence", "thinkMs", "sessionId", "attemptId", "device", "capLimit", "boxCapped", "examAdjusted", "createdAt", "updatedAt"]) };
   } else {
     data = { ...data, ...pick(doc, ["cardId", "reviewLogId", "kind", "input", "output", "engine", "modelId", "modelSha256", "operationId", "occurredAt", "operation", "createdAt", "updatedAt"]) };
   }

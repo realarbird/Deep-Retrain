@@ -9,7 +9,12 @@ import { StudyDeck } from "@/models/StudyDeck";
 const CARD_FIELDS =
   "deckId conceptTitle coreFact expectedKeyPoints initialQuestion currentQuestion leitnerBox difficultyTier nextReviewDate lastReviewedAt reviewCount lapses lastScore suspended createdAt";
 const LOG_FIELDS =
-  "cardId deckId conceptTitle question userAnswer score responseLatencyMs outcome boxBefore boxAfter mode engine confidence device reviewedAt simulated";
+  "cardId deckId conceptTitle question userAnswer score responseLatencyMs latencyThresholdMs outcome boxBefore boxAfter mode engine confidence device reviewedAt simulated";
+
+/** The time the card allowed. Logs from before cards had their own time have none. */
+function secondsAllowed(log: { latencyThresholdMs?: number | null }): number | null {
+  return typeof log.latencyThresholdMs === "number" ? log.latencyThresholdMs / 1000 : null;
+}
 
 function attachment(body: string, filename: string, type: string) {
   return new NextResponse(body, {
@@ -57,6 +62,7 @@ export const GET = withIdentity(async (identity, request: NextRequest) => {
         { header: "Mode", value: (l) => l.mode ?? "write" },
         { header: "Score", value: (l) => l.score },
         { header: "Seconds", value: (l) => Math.round(l.responseLatencyMs / 100) / 10 },
+        { header: "Seconds allowed", value: (l) => secondsAllowed(l) },
         { header: "Outcome", value: (l) => l.outcome },
         { header: "Box before", value: (l) => l.boxBefore },
         { header: "Box after", value: (l) => l.boxAfter },
@@ -112,6 +118,7 @@ export const GET = withIdentity(async (identity, request: NextRequest) => {
       answer: l.userAnswer,
       score: l.score,
       seconds: Math.round(l.responseLatencyMs / 100) / 10,
+      secondsAllowed: secondsAllowed(l),
       outcome: l.outcome,
       boxBefore: l.boxBefore,
       boxAfter: l.boxAfter,

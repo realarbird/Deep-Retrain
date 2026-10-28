@@ -31,6 +31,20 @@ describe("parseSettings", () => {
   it("refuses unknown keys in a patch", () => {
     expect(settingsPatchSchema.safeParse({ capPrev: 25 }).success).toBe(false);
   });
+
+  it("starts extra time at none, including for settings saved before it existed", () => {
+    const older: Record<string, unknown> = { ...defaultSettings(), theme: "dark" };
+    delete older.extraTime;
+    expect(parseSettings(older)).toMatchObject({ theme: "dark", extraTime: 0 });
+    expect(parseSettings({ extraTime: 50 }).extraTime).toBe(50);
+    expect(parseSettings({ extraTime: 30 }).extraTime).toBe(0);
+  });
+
+  it("only takes the extra time Settings offers", () => {
+    for (const extraTime of [0, 25, 50, 100]) expect(settingsPatchSchema.safeParse({ extraTime }).success).toBe(true);
+    expect(settingsPatchSchema.safeParse({ extraTime: 200 }).success).toBe(false);
+    expect(applySettingsPatch(defaultSettings(), { extraTime: 25 }, "2026-10-23", NOW).extraTime).toBe(25);
+  });
 });
 
 describe("daily cap changes", () => {

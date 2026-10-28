@@ -4,7 +4,7 @@ import { effectiveDailyCapFor, getAccountState } from "@/lib/account";
 import type { LogEngine } from "@/lib/ai/types";
 import { getGoogleApiKey } from "@/lib/aiKey";
 import { HttpError, readJson, safeAfter, withIdentity } from "@/lib/api";
-import { describeDevice, DEVICE_HEADER, validDeviceId } from "@/lib/devices";
+import { describeDevice, DEVICE_HEADER, isTouchDevice, validDeviceId } from "@/lib/devices";
 import { evaluateAndFollowUp, explainDifferently, replyToFollowUp } from "@/lib/engine";
 import { applyExamWindow } from "@/lib/examPlan";
 import type { Identity } from "@/lib/identity";
@@ -21,8 +21,9 @@ import {
   selfRatedFeedback,
   type KeyGrade,
 } from "@/lib/reviewFlow";
+import type { Settings } from "@/lib/settingsSchema";
 import { getCapStatus, toReviewCardDTO } from "@/lib/study";
-import { revealedSinceReview, teachQuestion } from "@/lib/studyQueue";
+import { cardAnswerTimeMs, revealedSinceReview, teachQuestion, type AnswerTimeOptions } from "@/lib/studyQueue";
 import { resolveZone } from "@/lib/timezone";
 import { reviewBodySchema, type GradedReviewBody } from "@/lib/validation";
 import { ConceptCard, type ConceptCardDoc } from "@/models/ConceptCard";
@@ -75,9 +76,9 @@ function deviceOf(request: NextRequest): { kind: string; label: string } | null 
   return describeDevice(userAgent(request));
 }
 
-async function capFor(identity: Identity, tz: number, now: Date) {
-  const account = await getAccountState(identity);
-  return getCapStatus(identity.userId, tz, now, effectiveDailyCapFor(account.settings, now, tz));
+async function capFor(identity: Identity, tz: number, now: Date, settings?: Settings) {
+  const current = settings ?? (await getAccountState(identity)).settings;
+  return getCapStatus(identity.userId, tz, now, effectiveDailyCapFor(current, now, tz));
 }
 
 /** Grade one answer in any mode, move the card, and log the review. */
@@ -92,7 +93,8 @@ async function handleGraded(identity: Identity, body: GradedReviewBody, request:
     if (prior?.replay) return NextResponse.json({ ...(prior.replay as object), replayed: true });
   }
 
-  const capBefore = await capFor(identity, tz, now);
+  const { settings } = await getAccountState(identity);
+  const capBefore = await capFor(identity, tz, now, settings);
   if (capBefore.reached) throw new HttpError(429, CAP_MESSAGE, { capReached: true, cap: capBefore });
 
   const card = await ConceptCard.findById(body.cardId);
@@ -109,7 +111,9 @@ async function handleGraded(identity: Identity, body: GradedReviewBody, request:
     throw new HttpError(409, "You've already seen this card's answer, so it can only be rated now.", { revealed: true });
   }
 
-  const graded = await gradeAttempt(identity, card, body, mode, now);
+  // The card's time is worked out here, the same way the study screen did; the browser's copy isn't trusted.
+  const time: AnswerTimeOptions = { touch: isTouchDevice(userAgent(request)), extraTime: settings.extraTime };
+  const graded = await gradeAttempt(identity, card, body, mode, now, time);
 
   // Gemma takes a few seconds; another device may have used the last review of the day meanwhile.
   if (MODE_RULES[mode].grader === "model") {
@@ -209,6 +213,7 @@ async function handleGraded(identity: Identity, body: GradedReviewBody, request:
       userAnswer: graded.given,
       score: graded.score,
       responseLatencyMs: latencyMs,
+      latencyThresholdMs: graded.decision.latencyThresholdMs,
       outcome: graded.decision.outcome,
       boxBefore: card.leitnerBox,
       boxAfter: graded.decision.newBox,
@@ -246,7 +251,14 @@ async function handleGraded(identity: Identity, body: GradedReviewBody, request:
   return NextResponse.json(response);
 }
 
-async function gradeAttempt(identity: Identity, card: CardDoc, body: GradedReviewBody, mode: StudyMode, now: Date): Promise<Graded> {
+async function gradeAttempt(
+  identity: Identity,
+  card: CardDoc,
+  body: GradedReviewBody,
+  mode: StudyMode,
+  now: Date,
+  time: AnswerTimeOptions,
+): Promise<Graded> {
   const none = { method: "none" as RetrievalMethod, concepts: [] as RelatedHit[] };
   const base = {
     mode,
@@ -283,7 +295,7 @@ async function gradeAttempt(identity: Identity, card: CardDoc, body: GradedRevie
       },
       body.answer,
       body.latencyMs,
-      { related, googleApiKey: await getGoogleApiKey(identity), now, mode: modelMode },
+      { related, googleApiKey: await getGoogleApiKey(identity), now, mode: modelMode, latencyThresholdMs: cardAnswerTimeMs(card, mode, time) },
     );
     const { score, feedback, coveredKeyPoints, missingKeyPoints, followUpQuestion, analogy, nextQuestion, engine, ...decision } = result;
     return {
@@ -310,7 +322,15 @@ async function gradeAttempt(identity: Identity, card: CardDoc, body: GradedRevie
       ...base,
       score,
       feedback: selfRatedFeedback(body.rating),
-      decision: decideOutcome({ score, latencyMs: body.latencyMs, box: card.leitnerBox, now, mode, forceHesitation }),
+      decision: decideOutcome({
+        score,
+        latencyMs: body.latencyMs,
+        box: card.leitnerBox,
+        now,
+        mode,
+        forceHesitation,
+        latencyThresholdMs: cardAnswerTimeMs(card, mode, time),
+      }),
       engine: "self-rated",
       correctAnswer: null,
       given: `(rated ${body.rating})`,
@@ -347,7 +367,14 @@ async function gradeAttempt(identity: Identity, card: CardDoc, body: GradedRevie
     ...base,
     score: grade.score,
     feedback: grade.feedback,
-    decision: decideOutcome({ score: grade.score, latencyMs: body.latencyMs, box: card.leitnerBox, now, mode }),
+    decision: decideOutcome({
+      score: grade.score,
+      latencyMs: body.latencyMs,
+      box: card.leitnerBox,
+      now,
+      mode,
+      latencyThresholdMs: cardAnswerTimeMs(card, mode, time, practice),
+    }),
     engine: "answer-key",
     correctAnswer: grade.correctAnswer,
     given: grade.given,

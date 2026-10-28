@@ -6,12 +6,13 @@ import { useSettings } from "@/components/SettingsProvider";
 import { speak, speechRecognitionSupported, speechSynthesisSupported } from "@/components/study/useSpeech";
 import { Button, Card, ErrorNote, Kicker, SectionTitle, Segmented, Switch, Tag } from "@/components/ui/primitives";
 import { api, formatRelative, MODE_INFO, zoneQuery, type DeviceInfo, type SettingsResponse, type SyncState } from "@/lib/client";
-import { CAP_MAX, CAP_MIN, DEFAULT_MODES, type DefaultMode, type SessionSize, type ThemeSetting } from "@/lib/settingsSchema";
+import { CAP_MAX, CAP_MIN, DEFAULT_MODES, EXTRA_TIME, type DefaultMode, type ExtraTime, type SessionSize, type ThemeSetting } from "@/lib/settingsSchema";
 import { PrivacyPolicy } from "@/components/PrivacyPolicy";
 import { AiKeySettings } from "./AiKeySettings";
 import { DeleteAccount } from "./DeleteAccount";
 
 const DEVICE_ICON = { phone: Smartphone, tablet: Tablet, desktop: Monitor };
+const EXTRA_TIME_LABEL: Record<ExtraTime, string> = { 0: "None", 25: "+25%", 50: "+50%", 100: "Double" };
 
 function syncSentence(sync: SyncState, isDemo: boolean): string {
   if (isDemo) return "This is a demo, so your settings are saved for this demo only. Sign in to keep them in your Auth0 account and use them on every device.";
@@ -132,6 +133,18 @@ export function SettingsView({ isDemo, onKeyChange }: { isDemo: boolean; onKeyCh
               />
               {settings.freeRecall === "voice" && !canHear && <p className="mt-1 text-xs text-ink-3">This browser can&apos;t do speech-to-text, so it will fall back to writing here.</p>}
             </div>
+            <div>
+              <p className="mb-1.5 text-sm text-ink">More time on every card</p>
+              <Segmented<ExtraTime>
+                label="More time on every card"
+                value={settings.extraTime}
+                onChange={(v) => update({ extraTime: v })}
+                options={EXTRA_TIME.map((v) => ({ value: v, label: EXTRA_TIME_LABEL[v] }))}
+              />
+              <p className="mt-1 text-xs text-ink-3">
+                Each card already gets more time for a harder question or a longer answer. This adds to all of them: for slower typing, reading in a second language, or a slow day.
+              </p>
+            </div>
             <div className="divide-y divide-line border-t border-line">
               <Switch
                 checked={settings.askConfidence}
@@ -161,18 +174,21 @@ export function SettingsView({ isDemo, onKeyChange }: { isDemo: boolean; onKeyCh
                 />
                 <span className="tabular-nums text-ink-2">{settings.speech.rate.toFixed(1)}×</span>
               </label>
-              <label className="flex flex-wrap items-center gap-3">
-                <span className="w-28 text-ink">Time to answer</span>
-                <input
-                  type="range"
-                  min={2}
-                  max={15}
-                  value={settings.speech.pauseSec}
-                  onChange={(e) => update({ speech: { pauseSec: Number(e.target.value) } })}
-                  className="w-44 accent-[var(--color-ink)]"
-                />
-                <span className="tabular-nums text-ink-2">{settings.speech.pauseSec}s</span>
-              </label>
+              <div>
+                <label className="flex flex-wrap items-center gap-3">
+                  <span className="w-28 text-ink">Time to answer</span>
+                  <input
+                    type="range"
+                    min={2}
+                    max={15}
+                    value={settings.speech.pauseSec}
+                    onChange={(e) => update({ speech: { pauseSec: Number(e.target.value) } })}
+                    className="w-44 accent-[var(--color-ink)]"
+                  />
+                  <span className="tabular-nums text-ink-2">{settings.speech.pauseSec}s</span>
+                </label>
+                <p className="mt-1 text-xs text-ink-3">Harder cards and longer answers wait a few seconds more.</p>
+              </div>
               <Button variant="secondary" className="text-xs" onClick={() => void speak("Glycolysis. Where does it happen?", { rate: settings.speech.rate })}>
                 Try it
               </Button>

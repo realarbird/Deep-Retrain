@@ -31,7 +31,7 @@ function headline(r: ReviewResponse["result"]): { title: string; body: string } 
     const limit = r.latencyThresholdMs ? Math.round(r.latencyThresholdMs / 1000) : null;
     return {
       title: `Right, but slow. Staying in box ${r.newBox}.`,
-      body: limit ? `${secs}s is over the ${limit}s mark for ${label.toLowerCase()}. Quick recall is what moves a card up. Back ${when(r.intervalDays)}.` : `Back ${when(r.intervalDays)}.`,
+      body: limit ? `${secs}s is over the ${limit}s this card gets. Quick recall is what moves a card up. Back ${when(r.intervalDays)}.` : `Back ${when(r.intervalDays)}.`,
     };
   }
   return {

@@ -18,7 +18,7 @@ import {
   type SelfRating,
   type StudyItem,
 } from "@/lib/client";
-import { MODE_RULES } from "@/lib/leitner";
+import { listenPauseSec } from "@/lib/answerTime";
 import { GradedCard } from "./GradedCard";
 import { ChoiceAnswer } from "./modes/ChoiceAnswer";
 import { ClozeActions, ClozeMarked, ClozeSentence } from "./modes/ClozeAnswer";
@@ -37,6 +37,8 @@ interface Props {
   sessionId: string;
   askConfidence: boolean;
   speech: { rate: number; pauseSec: number };
+  /** The learner's extra time, in percent. */
+  extraTime: number;
   onGraded: (response: ReviewResponse, item: StudyItem) => void;
   onNext: () => void;
   onSkip: (reason: string) => void;
@@ -44,13 +46,15 @@ interface Props {
   onEnd: () => void;
 }
 
-export function StudyCard({ item, index, total, sessionId, askConfidence, speech, onGraded, onNext, onSkip, onCapReached, onEnd }: Props) {
+export function StudyCard({ item, index, total, sessionId, askConfidence, speech, extraTime, onGraded, onNext, onSkip, onCapReached, onEnd }: Props) {
   const [phase, setPhase] = useState<Phase>("answer");
   const [response, setResponse] = useState<ReviewResponse | null>(null);
   const [reveal, setReveal] = useState<{ coreFact: string; expectedKeyPoints: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [listenStep, setListenStep] = useState<"question" | "pause" | "answer" | "paused">("question");
-  const [pauseLeft, setPauseLeft] = useState(speech.pauseSec);
+  // Listen waits a little longer on harder cards and longer answers.
+  const pauseSec = listenPauseSec(speech.pauseSec, item.listenExtraSec, extraTime);
+  const [pauseLeft, setPauseLeft] = useState(pauseSec);
   const [cloze, setCloze] = useState("");
   const [clozeGiven, setClozeGiven] = useState("");
   // One attempt id per card, kept across retries, so a resent answer can't move the card twice.
@@ -58,7 +62,7 @@ export function StudyCard({ item, index, total, sessionId, askConfidence, speech
   const thinkMs = useRef<number | null>(null);
   const [revealedMs, setRevealedMs] = useState<number | null>(null);
   const { elapsed, read } = useStopwatch(item.id, phase === "answer");
-  const threshold = MODE_RULES[item.mode].latencyMs;
+  const threshold = item.latencyThresholdMs;
   const isFlip = item.mode === "flip" || item.mode === "listen";
 
   const post = useCallback(
@@ -139,7 +143,7 @@ export function StudyCard({ item, index, total, sessionId, askConfidence, speech
       await speak(`${item.conceptTitle}. ${item.prompt.kind === "flip" || item.prompt.kind === "open" ? item.prompt.question : ""}`, { rate: speech.rate });
       if (cancelled) return;
       setListenStep("pause");
-      let left = speech.pauseSec;
+      let left = pauseSec;
       setPauseLeft(left);
       await new Promise<void>((resolve) => {
         timer = window.setInterval(() => {

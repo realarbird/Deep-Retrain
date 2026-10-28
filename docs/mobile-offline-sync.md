@@ -50,3 +50,5 @@ Provenance allow-list (protocol v1):
 - `ollama:gemma4:e4b`: `370c2879f17648d337b0ab4e208fdce348e24d1060064e93d7645daafd56d39c` (current registry model layer, independently read from the official Ollama registry manifest), or `4c27e0f5b5adf02ac956c7322bd2ee7636fe3f45a8512c9aba5385242cb6e09a` (installed Ollama manifest's model layer). Tags alone are insufficient.
 - `createDeck` accepts `modelId`/`modelSha256`; clients should send them explicitly. Existing Android-shaped requests default to the pinned E2B artifact.
 - `review` also accepts optional integer `confidence` (1–3). The server stores it without changing grading.
+
+Timing compatibility: web study sessions use per-card time allowances and the account's extra-time setting. Existing protocol v1 native offline reviews keep the mode's base time so queued work is not regraded under rules the client did not show. New review records include the server-derived `latencyThresholdMs` in push acknowledgements and review snapshots (null for Listen). Clients should preserve this field in history; older records may omit it. Native per-card timing needs a coordinated client/protocol update.

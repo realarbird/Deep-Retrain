@@ -301,6 +301,24 @@ describe("practice items and explanations", () => {
     expect(bodies[0]).toContain("explain a concept to someone who has never heard of it");
   });
 
+  it("marks against the card's own time", async () => {
+    const bodies: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.endsWith("/api/tags")) return jsonResponse({ models: [{ name: "gemma4:e4b" }] });
+        bodies.push(String(init?.body));
+        return jsonResponse({ message: { content: JSON.stringify(EVAL) } });
+      }),
+    );
+    const { evaluateAndFollowUp } = await loadEngine();
+    // 20 seconds is slow for Write's base time, but inside this card's 31.
+    const r = await evaluateAndFollowUp(CARD, "answer", 20_000, { latencyThresholdMs: 31_000 });
+    expect(r).toMatchObject({ outcome: "promote", latencyThresholdMs: 31_000, nextQuestion: EVAL.nextQuestion, followUpQuestion: null });
+    expect(bodies[0]).toContain("longer than 31s");
+    expect(bodies[0]).not.toContain("socraticFollowUp");
+  });
+
   it("tells the grader a voice answer was transcribed", async () => {
     const bodies: string[] = [];
     vi.stubGlobal(

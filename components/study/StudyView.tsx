@@ -198,6 +198,7 @@ export function StudyView({
           sessionId={session.id}
           askConfidence={session.askConfidence}
           speech={settings.speech}
+          extraTime={settings.extraTime}
           onGraded={onGraded}
           onNext={() => {
             setNotice(null);

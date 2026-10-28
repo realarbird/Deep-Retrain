@@ -3,6 +3,8 @@ import { afterQueue, auth, demo, DEVICE_ID, IPHONE_UA } from "./routeSetup";
 import { fakeDb } from "./helpers/fakeDb";
 import { NextRequest } from "next/server";
 import { cardSourceHash, heuristicCloze, toStoredPractice } from "@/lib/practice";
+import { defaultSettings } from "@/lib/settingsSchema";
+import { cardAnswerTimeMs } from "@/lib/studyQueue";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- route responses are loose JSON in these tests
 type Loose = any;
@@ -63,13 +65,14 @@ async function review(body: Record<string, unknown>) {
   return { status: res.status, body: (await res.json()) as Loose };
 }
 
-async function study(query: string) {
+async function study(query: string, headers: Record<string, string> = {}) {
   const { GET } = await import("@/app/api/study/route");
-  const res = await GET(new NextRequest(`http://test/api/study?tz=${TZ}&${query}`));
+  const res = await GET(new NextRequest(`http://test/api/study?tz=${TZ}&${query}`, { headers }));
   return { status: res.status, body: (await res.json()) as Loose };
 }
 
 const card = (id: string) => fakeDb.ConceptCard.docs.find((c) => c._id === id) as Loose;
+const GOOD_ANSWER = "It occurs in the cytoplasm, where glucose is split into two pyruvate and nets two ATP.";
 const logs = () => fakeDb.ReviewLog.docs as Loose[];
 
 describe("POST /api/review", () => {
@@ -101,6 +104,42 @@ describe("POST /api/review", () => {
     expect(logs()[0]).toMatchObject({ mode: "write", device: { kind: "phone", label: "Safari on iPhone" }, capLimit: 15 });
     // The cap sent back already counts this review.
     expect(r.body.cap).toMatchObject({ used: 1, remaining: 14, reached: false });
+  });
+
+  it("gives a long written answer the time its card allows", async () => {
+    const { cardId } = seedDeck({ box: 3 });
+    const s = await study("mode=write&size=5", { "user-agent": IPHONE_UA });
+    const item = s.body.items.find((i: Loose) => i.id === cardId(0));
+    expect(item.latencyThresholdMs).toBe(cardAnswerTimeMs(card(cardId(0)), "write", { touch: true, extraTime: 0 }));
+    // Twenty seconds would be slow against Write's base 12, but this synthesis card on a phone allows more.
+    expect(item.latencyThresholdMs).toBeGreaterThan(20_000);
+
+    const r = await review({ mode: "write", cardId: cardId(0), answer: GOOD_ANSWER, latencyMs: 20_000 });
+    expect(r.body.result).toMatchObject({ outcome: "promote", newBox: 4, latencyThresholdMs: item.latencyThresholdMs });
+    expect(logs()[0].latencyThresholdMs).toBe(item.latencyThresholdMs);
+  });
+
+  it("counts a right answer at the card's time as slow", async () => {
+    const { cardId } = seedDeck({ box: 3 });
+    const s = await study("mode=write&size=5", { "user-agent": IPHONE_UA });
+    const item = s.body.items.find((i: Loose) => i.id === cardId(0));
+    const r = await review({ mode: "write", cardId: cardId(0), answer: GOOD_ANSWER, latencyMs: item.latencyThresholdMs });
+    expect(r.body.result).toMatchObject({ outcome: "hesitation", newBox: 3, latencyThresholdMs: item.latencyThresholdMs });
+  });
+
+  it("adds time for typing on a phone and for the learner's extra time", async () => {
+    const { cardId } = seedDeck({ box: 3 });
+    const timeOn = async (headers: Record<string, string> = {}) =>
+      (await study("mode=write&size=5", headers)).body.items.find((i: Loose) => i.id === cardId(0)).latencyThresholdMs;
+    const desk = await timeOn();
+    expect(await timeOn({ "user-agent": IPHONE_UA })).toBeGreaterThan(desk);
+
+    fakeDb.UserProfile.reset([{ auth0Id: demo.userId, settings: { ...defaultSettings(), extraTime: 50 } }]);
+    expect(await timeOn()).toBe(cardAnswerTimeMs(card(cardId(0)), "write", { touch: false, extraTime: 50 }));
+    const phone = await timeOn({ "user-agent": IPHONE_UA });
+    expect(phone).toBeGreaterThan(desk * 1.5);
+    const r = await review({ mode: "write", cardId: cardId(0), answer: GOOD_ANSWER, latencyMs: phone - 1 });
+    expect(r.body.result).toMatchObject({ outcome: "promote", latencyThresholdMs: phone });
   });
 
   it("grades multiple choice against the answer key, with no network", async () => {
