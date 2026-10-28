@@ -140,7 +140,7 @@ async function applyOperation(owner: string, op: MobileOperation, settings: Acco
       }, { new: true, session }).lean();
       const [log] = await ReviewLog.create([{
         _id: p.reviewLogId, auth0Id: owner, cardId: String(card._id), deckId: String(card.deckId), conceptTitle: String(card.conceptTitle), question, userAnswer: given, rawAnswer: p.answer,
-        score, responseLatencyMs: p.latencyMs, outcome: decision.outcome, boxBefore: Number(card.leitnerBox), boxAfter: decision.newBox, difficultyTier: decision.difficultyTier,
+        score, responseLatencyMs: p.latencyMs, latencyThresholdMs: decision.latencyThresholdMs, outcome: decision.outcome, boxBefore: Number(card.leitnerBox), boxAfter: decision.newBox, difficultyTier: decision.difficultyTier,
         feedback, coveredKeyPoints: p.coveredKeyPoints, missingKeyPoints: p.missingKeyPoints, followUpQuestion: p.followUpQuestion ?? null, analogy: p.analogy ?? null,
         engine: "on-device", modelId: p.modelId, modelSha256: p.modelSha256, operationId: op.id, simulated: false, reviewedAt: at, mode: p.mode,
         selfRating: rating ?? null, confidence: p.confidence ?? null, thinkMs: p.thinkMs ?? null, sessionId: p.sessionId ?? null, attemptId: p.attemptId, capLimit: cap, boxCapped: decision.boxCapped, examAdjusted: exam.adjusted,

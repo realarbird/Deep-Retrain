@@ -181,7 +181,7 @@ export async function seedSampleDeck(
       history.map((h) => {
         const card = cards[h.cardIndex];
         const boxBefore = Math.max(1, BOX_PLAN[h.cardIndex] - 1);
-        const decision = decideOutcome({ score: h.score, latencyMs: h.latencyMs, box: boxBefore, now: h.reviewedAt });
+        const decision = decideOutcome({ score: h.score, latencyMs: h.latencyMs, box: boxBefore, now: h.reviewedAt, mode: h.mode });
         return {
           auth0Id: identity.userId,
           cardId: card._id,

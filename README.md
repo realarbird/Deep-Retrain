@@ -102,6 +102,8 @@ For example, the sample card *Cellular Respiration* has 28 words of key points. 
 
 All the numbers sit in one table in [`lib/answerTime.ts`](lib/answerTime.ts).
 
+These allowances apply to web study sessions. Existing native offline clients keep their protocol v1 mode limits; synced history records the actual time allowed. See [mobile timing compatibility](docs/mobile-offline-sync.md).
+
 ## The numbers (Stats tab)
 
 One filter row (30 days, 90 days or a year, and a deck). Every chart has a table view.
