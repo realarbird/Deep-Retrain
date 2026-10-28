@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BLANK,
+  PRACTICE_VERSION,
   cardSourceHash,
   fuzzyTermMatch,
   gradeChoice,
@@ -68,15 +69,39 @@ describe("multiple choice", () => {
 });
 
 describe("fill the gap", () => {
-  it("blanks a key-point term that isn't in the title", () => {
+  it("can blank the complete concept title instead of an arbitrary word", () => {
     const cloze = heuristicCloze(card)!;
-    expect(cloze.text).toContain(BLANK);
-    expect(cloze.answers[0]).not.toMatch(/glycolysis/i);
-    expect(card.expectedKeyPoints.join(" ").toLowerCase()).toContain(cloze.answers[0].toLowerCase());
+    expect(cloze.answers).toEqual(["Glycolysis"]);
+    expect(cloze.text).toBe(card.coreFact.replace("Glycolysis", BLANK));
   });
 
   it("prefers the hand-picked terms when they appear in the fact", () => {
     expect(heuristicCloze(card, ["pyruvate"])).toEqual({ text: card.coreFact.replace("pyruvate", BLANK), answers: ["pyruvate"] });
+  });
+
+  it("uses explicit phrases, acronyms, names and dates supported by the card", () => {
+    const cases = [
+      { coreFact: "The proton gradient drives ATP synthase in the membrane.", expectedKeyPoints: ["Key terms: ATP synthase, proton gradient"], answer: "ATP synthase" },
+      { coreFact: "Cells capture energy as ATP during respiration.", expectedKeyPoints: ["energy captured as ATP"], answer: "ATP" },
+      { coreFact: "Napoleon fought at Waterloo in 1815.", expectedKeyPoints: ["Napoleon fought at Waterloo"], answer: "Napoleon" },
+      { coreFact: "They fought their final battle in 1815.", expectedKeyPoints: ["The final battle was in 1815"], answer: "1815" },
+    ];
+    for (const { answer, ...content } of cases) {
+      const input = { ...card, conceptTitle: "Review", ...content };
+      expect(heuristicCloze(input)?.answers, input.coreFact).toEqual([answer]);
+      expect(heuristicCloze(input)).toEqual(heuristicCloze(input));
+    }
+  });
+
+  it("doesn't select ordinary verbs, filler, or just the longest word", () => {
+    for (const coreFact of ["They fought together and worked hard.", "It happens differently and unexpectedly.", "They eventually made something important."]) {
+      expect(heuristicCloze({ ...card, conceptTitle: "Overview", coreFact, expectedKeyPoints: [coreFact] })).toBeNull();
+    }
+  });
+
+  it("never creates repeated blanks or leaves the answer elsewhere", () => {
+    const repeated = { ...card, coreFact: "Glycolysis starts the process; glycolysis finishes the process.", expectedKeyPoints: [] };
+    expect(heuristicCloze(repeated, ["Glycolysis"])).toBeNull();
   });
 
   it("forgives plurals, endings and small typos, but not wrong numbers", () => {
@@ -88,6 +113,16 @@ describe("fill the gap", () => {
     expect(fuzzyTermMatch("3", "2")).toBe("wrong");
     expect(fuzzyTermMatch("mitochondria", "cytoplasm")).toBe("wrong");
     expect(fuzzyTermMatch("", "cytoplasm")).toBe("wrong");
+  });
+
+  it("protects acronyms, chemical charges, short terms and formula operators", () => {
+    for (const [given, expected] of [["ADP", "ATP"], ["RNA", "DNA"], ["atps", "ATP"], ["ADP synthase", "ATP synthase"], ["NAD", "NAD+"], ["NAD", "NAD-"], ["H-", "H+"], ["H2", "H2O"], ["G", "ΔG"], ["cup", "cap"]]) {
+      expect(fuzzyTermMatch(given, expected), `${given} / ${expected}`).toBe("wrong");
+    }
+    expect(fuzzyTermMatch("atp", "ATP")).toBe("exact");
+    expect(fuzzyTermMatch("NAD+", "NAD+")).toBe("exact");
+    expect(fuzzyTermMatch("ΔG", "ΔG")).toBe("exact");
+    expect(fuzzyTermMatch("atp syntase", "ATP synthase")).toBe("typo");
   });
 
   it("scores exact, close and wrong answers", () => {
@@ -119,11 +154,11 @@ describe("true or false", () => {
 
 describe("stored practice", () => {
   it("is used only while the card reads the same", () => {
-    const stored = toStoredPractice(card, { cloze: { text: `${BLANK} happens`, answers: ["x"] } }, "google-ai-studio");
+    const stored = toStoredPractice(card, { cloze: { text: `Glycolysis takes place in the ${BLANK}.`, answers: ["cytoplasm"] } }, "google-ai-studio");
     const withPractice = { ...card, practice: stored };
     expect(storedPractice(withPractice)).toEqual(stored);
     expect(practiceVersion(withPractice)).toBe(`s:${cardSourceHash(card)}`);
-    expect(resolvePractice(withPractice, siblings).cloze?.answers).toEqual(["x"]);
+    expect(resolvePractice(withPractice, siblings).cloze?.answers).toEqual(["cytoplasm"]);
 
     const edited = { ...withPractice, coreFact: `${card.coreFact} Edited.` };
     expect(storedPractice(edited)).toBeNull();
@@ -131,14 +166,37 @@ describe("stored practice", () => {
   });
 
   it("rebuilds the heuristic items on request even when stored ones exist", () => {
-    const stored = toStoredPractice(card, { cloze: { text: `${BLANK} happens`, answers: ["x"] } }, "ollama");
+    const stored = toStoredPractice(card, { cloze: { text: `Glycolysis takes place in the ${BLANK}.`, answers: ["cytoplasm"] } }, "ollama");
     const r = resolvePractice({ ...card, practice: stored }, siblings, { useStored: false });
     expect(r.source).toBe("heuristic");
-    expect(r.cloze?.answers).not.toEqual(["x"]);
+    expect(r.cloze?.answers).not.toEqual(["cytoplasm"]);
+  });
+
+  it("retires legacy practice and rejects stored questions with unsupported answers", () => {
+    const practice = toStoredPractice(card, { cloze: { text: `Glycolysis happens in the ${BLANK}.`, answers: ["cytoplasm"] } }, "ollama");
+    expect(PRACTICE_VERSION).toBeGreaterThan(1);
+    expect(storedPractice({ ...card, practice: { ...practice, v: 1 } })).toBeNull();
+    expect(storedPractice({ ...card, practice: { ...practice, cloze: { text: `They ${BLANK}.`, answers: ["fought"] } } })).toBeNull();
+    expect(storedPractice({ ...card, practice: { ...practice, cloze: { text: `The cytoplasm contains ${BLANK}.`, answers: ["cytoplasm"] } } })).toBeNull();
   });
 });
 
 describe("normalizePracticeItem", () => {
+  it.each(["fought", "happened", "makes", "important", "they"])("rejects ordinary or grammatical answer %s even when it occurs in key points", (answer) => {
+    const content = { ...card, coreFact: `They fought and happened to make important discoveries.`, expectedKeyPoints: [`they fought; happened; makes; important`] };
+    expect(normalizePracticeItem({ cloze: { sentence: `A question with ${BLANK}.`, answer } }, content).cloze).toBeUndefined();
+  });
+
+  it("accepts a scientific phrase and rejects invented answers, duplicates and multiple gaps", () => {
+    const content = { ...card, coreFact: "ATP synthase uses a proton gradient to produce ATP.", expectedKeyPoints: ["ATP synthase uses a proton gradient"] };
+    expect(normalizePracticeItem({ cloze: { sentence: `The proton gradient drives ${BLANK}.`, answer: "ATP synthase" } }, content).cloze?.answers).toEqual(["ATP synthase"]);
+    for (const cloze of [
+      { sentence: `It uses ${BLANK}.`, answer: "chlorophyll" },
+      { sentence: `ATP synthase drives ${BLANK}.`, answer: "ATP synthase" },
+      { sentence: `${BLANK} uses ${BLANK}.`, answer: "ATP synthase" },
+    ]) expect(normalizePracticeItem({ cloze }, content).cloze).toBeUndefined();
+  });
+
   it("keeps good parts and drops bad ones", () => {
     const parts = normalizePracticeItem(
       {

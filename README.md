@@ -59,7 +59,7 @@ Cramming feels productive and fades within days. DeepRetain asks for about **15 
 | **Multiple choice** | Pick one of four (keys 1–4) | answer key | 8 s | box 3 |
 | **True or false** | One statement, two buttons (keys T and F) | answer key | 6 s | box 3 |
 | **Flip** | Think of the answer, flip the card (Space), rate yourself 1–4 | your rating | 8 s | box 4 |
-| **Fill the gap** | Type the one missing word. Plurals, stems and small typos are fine; numbers must be exact | answer key | 10 s | box 4 |
+| **Fill the gap** | Recall a key term or phrase. Longer words allow plurals and small typos; acronyms, numbers and symbols must match exactly | answer key | 10 s | box 4 |
 | **Write** | Answer in your own words (Ctrl+Enter) | Gemma | 12 s | box 5 |
 | **Say it** | Answer out loud; your browser turns it into text you can edit before sending | Gemma | 15 s | box 5 |
 | **Teach it back** | Explain it to someone who's never heard of it | Gemma, with a teaching rubric | 90 s | box 5 |
@@ -68,6 +68,8 @@ Cramming feels productive and fades within days. DeepRetain asks for about **15 
 Harder questions, longer reads and longer answers get more time than that; see [Time for each card](#time-for-each-card).
 
 After a session you can play a **cool-down match**: five titles against five facts, using only cards you just answered. It isn't marked or logged.
+
+Fill-the-gap questions use source-backed key terms rather than arbitrary words. Gemma selects a meaningful term; local checks reject ordinary verbs, unsupported answers and questions that reveal the answer. Without AI, curated terms, explicit term lists, concept titles and supported names, dates or acronyms provide a conservative fallback. If none fits, the card uses its normal written question. Concept titles stay hidden until a gap is answered.
 
 Every marked mode counts toward the daily limit, moves the card and logs the review. Sessions take 5, 10, 15 or everything left today, optionally from one deck. Overdue cards come first, then decks with an exam in the next week, then the decks take turns.
 
@@ -315,6 +317,8 @@ Without the index, retrieval falls back to in-app cosine similarity over the sam
 2. Allowed Callback URL: `https://<your-app>/auth/callback`. Allowed Logout URL: `https://<your-app>`.
 3. Set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and `AUTH0_SECRET` (`openssl rand -hex 32`).
 4. **Let the app write to learners' accounts** (AI keys, settings, devices and the progress summary). In the Auth0 dashboard, open **Applications → APIs → Auth0 Management API → Machine to Machine Applications**, authorize your application, and grant `read:users` and `update:users_app_metadata`. Make sure **Client Credentials** is enabled under the application's **Advanced Settings → Grant Types**. To use a separate machine-to-machine app instead, set `AUTH0_MANAGEMENT_CLIENT_ID` and `AUTH0_MANAGEMENT_CLIENT_SECRET`. If `AUTH0_DOMAIN` is a custom domain, set `AUTH0_MANAGEMENT_DOMAIN` to the tenant's `*.auth0.com` domain.
+
+For **Delete account** in Settings to remove the Auth0 user too, also grant `delete:users`. Without it, deleting an account still erases everything in MongoDB and clears the `deepretain_*` keys in Auth0, but the sign-in itself stays, and Settings asks the learner to email for its removal.
 
 Without step 4, sign-in still works; Settings shows "Not syncing" and keeps changes in MongoDB until access is granted.
 

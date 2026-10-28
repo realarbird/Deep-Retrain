@@ -22,7 +22,7 @@ const WAYS = [
   {
     when: "A word or a sentence",
     modes: [
-      ["Fill the gap", "type the one missing word"],
+      ["Fill the gap", "recall a key term or phrase"],
       ["Write", "answer in your own words"],
       ["Say it", "answer out loud"],
     ],
@@ -249,6 +249,9 @@ export function Landing({ auth0Enabled, demoEnabled }: { auth0Enabled: boolean; 
           <p>
             Answers are marked by <TextLink href="https://ai.google.dev/gemma">Gemma 4</TextLink>, an open model. Sign-in by Auth0,
             data on MongoDB Atlas, hosted on Render.
+          </p>
+          <p>
+            <TextLink href="/privacy.html">Privacy policy</TextLink>
           </p>
         </div>
       </footer>

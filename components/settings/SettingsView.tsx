@@ -7,7 +7,9 @@ import { speak, speechRecognitionSupported, speechSynthesisSupported } from "@/c
 import { Button, Card, ErrorNote, Kicker, SectionTitle, Segmented, Switch, Tag } from "@/components/ui/primitives";
 import { api, formatRelative, MODE_INFO, zoneQuery, type DeviceInfo, type SettingsResponse, type SyncState } from "@/lib/client";
 import { CAP_MAX, CAP_MIN, DEFAULT_MODES, EXTRA_TIME, type DefaultMode, type ExtraTime, type SessionSize, type ThemeSetting } from "@/lib/settingsSchema";
+import { PrivacyPolicy } from "@/components/PrivacyPolicy";
 import { AiKeySettings } from "./AiKeySettings";
+import { DeleteAccount } from "./DeleteAccount";
 
 const DEVICE_ICON = { phone: Smartphone, tablet: Tablet, desktop: Monitor };
 const EXTRA_TIME_LABEL: Record<ExtraTime, string> = { 0: "None", 25: "+25%", 50: "+50%", 100: "Double" };
@@ -22,7 +24,7 @@ function syncSentence(sync: SyncState, isDemo: boolean): string {
 }
 
 export function SettingsView({ isDemo, onKeyChange }: { isDemo: boolean; onKeyChange: () => Promise<void> }) {
-  const { settings, update, sync, devices, thisDevice, capToday, saving, error, replace } = useSettings();
+  const { settings, update, sync, devices, thisDevice, capToday, saving, dirty, error, retry, replace } = useSettings();
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const canHear = speechRecognitionSupported();
@@ -56,10 +58,11 @@ export function SettingsView({ isDemo, onKeyChange }: { isDemo: boolean; onKeyCh
       <div className="space-y-8">
         <div>
           <h1 className="font-serif text-3xl font-medium text-ink">Settings</h1>
-          <p className="mt-1 text-sm text-ink-3">{saving ? "Saving…" : "Changes save on their own."}</p>
+          <p role="status" className="mt-1 text-sm text-ink-3">{saving ? "Saving…" : dirty ? "Unsaved changes." : "Changes save on their own."}</p>
           {error && (
             <div className="mt-2">
               <ErrorNote>{error}</ErrorNote>
+              <Button variant="secondary" className="mt-2 text-xs" onClick={retry} disabled={saving}>Retry save</Button>
             </div>
           )}
         </div>
@@ -293,7 +296,13 @@ export function SettingsView({ isDemo, onKeyChange }: { isDemo: boolean; onKeyCh
             </li>
           </ul>
         </section>
+
+        {!isDemo && <DeleteAccount />}
       </aside>
+
+      <div className="lg:col-span-2">
+        <PrivacyPolicy />
+      </div>
     </div>
   );
 }

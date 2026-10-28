@@ -164,6 +164,7 @@ export const TIER_LABEL: Record<Tier, string> = {
 };
 
 export const ENGINE_SHORT: Record<string, string> = {
+  "on-device": "On-device Gemma 4",
   ollama: "Gemma 4 (Ollama)",
   "google-ai-studio": "Gemma 4",
   heuristic: "Offline grader",
@@ -195,7 +196,7 @@ export const MODE_INFO: Record<StudyMode | "auto", ModeInfo> = {
   choice: { label: "Multiple choice", blurb: "Pick one of four.", pace: "about 5 s a card", grader: "answer key" },
   truefalse: { label: "True or false", blurb: "One statement, two buttons.", pace: "about 4 s a card", grader: "answer key" },
   flip: { label: "Flip", blurb: "Think of the answer, flip the card, say how it went.", pace: "about 6 s a card", grader: "you" },
-  cloze: { label: "Fill the gap", blurb: "Type the one missing word.", pace: "about 8 s a card", grader: "answer key" },
+  cloze: { label: "Fill the gap", blurb: "Recall a key term or phrase.", pace: "about 8 s a card", grader: "answer key" },
   write: { label: "Write", blurb: "Answer in your own words.", pace: "about 20 s a card", grader: "Gemma" },
   voice: { label: "Say it", blurb: "Answer out loud. Your browser turns it into text.", pace: "about 15 s a card", grader: "Gemma" },
   teach: { label: "Teach it back", blurb: "Explain it to someone who's never heard of it.", pace: "about a minute a card", grader: "Gemma" },

@@ -24,9 +24,15 @@ const reviewLogSchema = new Schema(
     retrievedConceptIds: [{ type: Schema.Types.ObjectId, ref: "ConceptCard" }],
     engine: {
       type: String,
-      enum: ["ollama", "google-ai-studio", "heuristic", "simulated", "answer-key", "self-rated"],
+      enum: ["ollama", "google-ai-studio", "heuristic", "simulated", "answer-key", "self-rated", "on-device"],
       required: true,
     },
+    modelId: { type: String, default: null },
+    modelSha256: { type: String, default: null },
+    operationId: { type: String, default: null },
+    rawAnswer: { type: Schema.Types.Mixed, default: null },
+    coveredKeyPoints: { type: [String], default: [] },
+    missingKeyPoints: { type: [String], default: [] },
     simulated: { type: Boolean, default: false },
     reviewedAt: { type: Date, required: true, default: () => new Date() },
     /** How the card was answered. Older logs have no field and count as "write". */

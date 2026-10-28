@@ -60,6 +60,7 @@ export interface StudyItem {
   latencyThresholdMs: number | null;
   /** Listen only: seconds added to the learner's pause before the answer is read. */
   listenExtraSec: number;
+  fallbackReason?: "no-key-term";
 }
 
 /** Typing on a phone or tablet, and the learner's extra time. */
@@ -236,6 +237,10 @@ export function buildSession(
       const siblings = (siblingsByDeck.get(String(card.deckId)) ?? []).filter((s) => s.conceptTitle !== card.conceptTitle);
       const practice = resolvePractice(card, siblings);
       const mode = pickMode(requested, card, { freeRecall, speech, practice });
-      return toStudyItem(card, mode, practice, titles.get(String(card.deckId)) ?? "", { touch, extraTime });
+      const item = toStudyItem(card, mode, practice, titles.get(String(card.deckId)) ?? "", { touch, extraTime });
+      if (mode === "write" && !practice.cloze && (requested === "cloze" || (requested === "auto" && card.leitnerBox === 2))) {
+        item.fallbackReason = "no-key-term";
+      }
+      return item;
     });
 }
