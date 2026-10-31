@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CardsBrowser } from "@/components/cards/CardsBrowser";
 import { IngestEditor } from "@/components/ingest/IngestEditor";
@@ -52,7 +52,7 @@ function tabFromHash(mode: Mode): Tab | null {
   return tab && tab.modes.includes(mode) ? tab.id : null;
 }
 
-export function AppShell({ user }: { user: { name: string; mode: Mode; picture: string | null } }) {
+export function AppShell({ user, apps }: { user: { name: string; mode: Mode; picture: string | null }; apps: ReactNode }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("today");
   const [data, setData] = useState<DashboardData | null>(null);
@@ -181,7 +181,7 @@ export function AppShell({ user }: { user: { name: string; mode: Mode; picture: 
           {tab === "cards" && <CardsBrowser data={data} actions={actions} isDemo={user.mode === "demo"} />}
           {tab === "stats" && <StatsView decks={data.decks} />}
           {tab === "add" && user.mode === "auth0" && <IngestEditor actions={actions} hasAiKey={data.aiKey.saved} />}
-          {tab === "settings" && <SettingsView isDemo={user.mode === "demo"} onKeyChange={refresh} />}
+          {tab === "settings" && <SettingsView isDemo={user.mode === "demo"} onKeyChange={refresh} apps={apps} />}
           {tab !== "study" && (
             <p className="mt-14 border-t border-line pt-4 text-xs text-ink-3" title={data.engine.label}>
               {data.engine.id === "heuristic"

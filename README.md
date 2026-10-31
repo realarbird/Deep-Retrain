@@ -157,6 +157,7 @@ Give a deck an exam date in the Cards tab. Reviews that would land on or after t
 - **Cards tab:** search, filter to due or suspended, edit a card (it's re-embedded, and its quiz versions are rewritten), suspend, reset its progress, or delete it with its history. Decks can be renamed, given an exam date, or deleted.
 - **Export:** everything as JSON, your cards as CSV, or every answer as CSV. Cells that look like spreadsheet formulas are escaped.
 - **Install:** DeepRetain has a web app manifest and icons, so it can be added to a phone's home screen or a desktop dock.
+- **Apps:** the landing page and Settings have download buttons. Android is in testing on Google Play, so the button first asks people to join `deepretain@googlegroups.com`. Mac downloads the newest `.dmg` on [GitHub Releases](https://github.com/realarbird/Deep-Retrain/releases) and shows its release notes (looked up once an hour). Windows shows a greyed-out Microsoft Store button until that version ships.
 
 ## Demo vs signed in
 

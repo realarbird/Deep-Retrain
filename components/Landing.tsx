@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { RetentionCurveChart } from "@/components/charts/RetentionCurveChart";
 import { IndexCard } from "@/components/notebook/IndexCard";
 import { CircledScore, PenTick, Squiggle, Tortoise } from "@/components/notebook/Doodles";
@@ -60,7 +60,7 @@ const FAQ = [
   },
 ];
 
-export function Landing({ auth0Enabled, demoEnabled }: { auth0Enabled: boolean; demoEnabled: boolean }) {
+export function Landing({ auth0Enabled, demoEnabled, apps }: { auth0Enabled: boolean; demoEnabled: boolean; apps: ReactNode }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,11 +82,16 @@ export function Landing({ auth0Enabled, demoEnabled }: { auth0Enabled: boolean; 
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
           <Wordmark />
-          {auth0Enabled && (
-            <a href="/auth/login" className="text-sm font-medium text-ink-2 hover:text-ink">
-              Sign in
+          <div className="flex items-center gap-5">
+            <a href="#apps" className="text-sm text-ink-2 hover:text-ink">
+              Get the app
             </a>
-          )}
+            {auth0Enabled && (
+              <a href="/auth/login" className="text-sm font-medium text-ink-2 hover:text-ink">
+                Sign in
+              </a>
+            )}
+          </div>
         </div>
       </header>
 
@@ -222,6 +227,14 @@ export function Landing({ auth0Enabled, demoEnabled }: { auth0Enabled: boolean; 
               </p>
             </div>
           </div>
+        </section>
+
+        <section id="apps" className="scroll-mt-4 border-t border-line py-14">
+          <h2 className="font-serif text-3xl font-medium text-ink">Get the app</h2>
+          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-2">
+            Rather have an app than a browser tab? DeepRetain is on Android and Mac, and Windows is on the way.
+          </p>
+          <div className="mt-8">{apps}</div>
         </section>
 
         <section className="border-t border-line py-14">
