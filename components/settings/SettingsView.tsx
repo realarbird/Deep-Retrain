@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Monitor, Smartphone, Tablet } from "lucide-react";
 import { useSettings } from "@/components/SettingsProvider";
 import { speak, speechRecognitionSupported, speechSynthesisSupported } from "@/components/study/useSpeech";
@@ -23,7 +23,7 @@ function syncSentence(sync: SyncState, isDemo: boolean): string {
   return sync.error ?? "Auth0 can't be reached right now. Everything is saved here and will sync when it's back.";
 }
 
-export function SettingsView({ isDemo, onKeyChange }: { isDemo: boolean; onKeyChange: () => Promise<void> }) {
+export function SettingsView({ isDemo, onKeyChange, apps }: { isDemo: boolean; onKeyChange: () => Promise<void>; apps: ReactNode }) {
   const { settings, update, sync, devices, thisDevice, capToday, saving, dirty, error, retry, replace } = useSettings();
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -273,6 +273,11 @@ export function SettingsView({ isDemo, onKeyChange }: { isDemo: boolean; onKeyCh
             <p className="text-sm text-ink-3">Devices show up here after you open DeepRetain on them.</p>
           )}
           {!isDemo && <p className="mt-2 text-xs text-ink-3">Removing a device only takes it off this list. To sign it out, log out on that device.</p>}
+        </section>
+
+        <section>
+          <Kicker className="mb-2">Get the app</Kicker>
+          {apps}
         </section>
 
         <section>
